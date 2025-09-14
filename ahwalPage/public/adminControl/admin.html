@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>لوحة التحكم — النماذج والمتطلبات</title>
+
+</head>
+
+
+<body>
+    </optgroup>
+    <optgroup label="icheck">
+        <option>icheck1</option>
+        <option>icheck2</option>
+        <option>icheck3</option>
+        <option>icheck4</option>
+        <option>icheck5</option>
+        <option>icheck1Option</option>
+        <option>icheck2Option</option>
+        <option>icheck3Option</option>
+        <option>icheck4Option</option>
+        <option>icheck5Option</option>
+    </optgroup>
+    <optgroup label="itxtDate/btn/lang">
+        <option>itxtDate1</option>
+        <option>itxtDate2</option>
+        <option>itxtDate3</option>
+        <option>itxtDate4</option>
+        <option>itxtDate5</option>
+        <option>ibtnAdd1</option>
+        <option>ibtnAdd1Length</option>
+        <option>Lang</option>
+        <option>altColName</option>
+        <option>altSubColName</option>
+        <option>ReqID</option>
+    </optgroup>
+    </select>
+    <input id="colLen" type="number" min="10" max="2000" value="200" style="width:120px" placeholder="الطول" />
+    <button id="btnAddCol" class="btn">➕ إضافة حقل</button>
+    <button id="btnDropCol" class="btn danger">🗑️ حذف حقل</button>
+    </div>
+    <small style="color:var(--muted)">يسمح فقط بالأسماء الخاصة المذكورة. تأكيد قبل أي عملية حذف.</small>
+    </div>
+    </div>
+
+
+    <!-- Drawer -->
+    <div class="drawer-backdrop" id="drawerBg"></div>
+    <aside class="drawer" id="drawer">
+        <div class="head">
+            <strong id="drawerTitle">تحرير السجل</strong>
+            <div style="display:flex; gap:8px">
+                <button id="btnSave" class="btn primary">💾 حفظ</button>
+                <button id="btnDelete" class="btn danger">حذف</button>
+                <button id="btnClose" class="btn">إغلاق</button>
+            </div>
+        </div>
+        <form id="editForm" class="form-grid"></form>
+        <div id="modelLinkBar" style="padding: 0 14px 14px; display:none">
+            <hr />
+            <div style="display:flex; gap:8px; align-items:center">
+                <label>ربط المتطلبات (ReqID):</label>
+                <input id="inpReqID" type="number" style="width:140px" />
+                <button id="btnPickReq" class="btn" type="button">اختيار…</button>
+                <button id="btnLinkReq" class="btn" type="button">تحديث الربط</button>
+            </div>
+        </div>
+        <div id="reqLinkedModels" style="padding: 0 14px 14px; display:none"></div>
+    </aside>
+
+
+    <!-- Simple picker modal reused for Req selection -->
+    <div class="drawer-backdrop" id="pickerBg" style="background:rgba(0,0,0,.45)"></div>
+    <aside class="drawer" id="picker" style="width:640px">
+        <div class="head">
+            <strong>اختيار متطلبات</strong>
+            <button id="btnClosePicker" class="btn">إغلاق</button>
+        </div>
+        <div style="padding: 14px">
+            <input id="pickerSearch" class="search" placeholder="بحث في المتطلبات…"
+                style="width:100%; margin-bottom:8px" />
+            <div id="pickerList" class="card" style="max-height:60vh; overflow:auto"></div>
+        </div>
+    </aside>
+</body>
