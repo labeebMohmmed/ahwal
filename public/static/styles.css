@@ -301,6 +301,55 @@ tr.method-inperson {
     margin-top: 12px
 }
 
+.table-mobile {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: none;
+    /* shown by media query */
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Stack mobile cards vertically, full width */
+.table-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;                /* space between cards */
+  width: 100%;
+}
+
+/* Each card fills the row */
+.table-mobile .m-case {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;                /* rely on gap */
+}
+
+/* Responsive toggle: table on desktop, cards on mobile */
+@media (max-width: 640px) {
+  #casesTable { display: none !important; }
+  #casesTableMobile { display: block !important; }
+}
+@media (min-width: 641px) {
+  #casesTableMobile { display: none !important; }
+}
+
+@media (max-width: 640px) {
+    .table {
+        display: none;
+    }
+
+    .table-mobile {
+        display: flex;
+    }
+}
 
 /* =========================
    Cards & Basics
@@ -367,6 +416,7 @@ tr.method-inperson {
     opacity: .5;
     cursor: not-allowed;
 }
+
 
 /* =========================
    Inputs / Selects / Radios / Checkboxes
@@ -936,11 +986,14 @@ input[type="checkbox"]:focus-visible {
     border-color: #fda4af;
 }
 
+
+
 /* =========================
    Step 4: Parties (lists & modal)
    ========================= */
 .party-section {
     margin-top: 1rem;
+    max-width: 80%;
 }
 
 .party-head {
@@ -958,7 +1011,7 @@ input[type="checkbox"]:focus-visible {
     display: grid;
     gap: .5rem;
     grid-template-columns: repeat(auto-fill, minmax(490px, 1fr));
-
+    max-width: 60%;
 }
 
 .p-card {
@@ -968,7 +1021,7 @@ input[type="checkbox"]:focus-visible {
     background: #fff;
 
     display: block;
-    width: 100%;
+    width: 70%;
     /* ✅ fill entire grid cell */
     box-sizing: border-box;
 }

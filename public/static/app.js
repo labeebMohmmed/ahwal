@@ -9,6 +9,7 @@
 // ---------- Config ----------
 const OFFICE_ID = '080'; // TODO: set from server/user profile if dynamic
 let appState = [];
+let new_case = false;
 /* ========= LocalStorage keys ========= */
 const LS = {
     saved: 'ahwal.currentStep',   // last viewed step (we won't exceed truth)
@@ -143,8 +144,8 @@ const CasesUI = {
 
 
 async function loadOfficeList(params = {}) {
-    document.getElementById('step10').hidden = false;
-    document.getElementById('step0').hidden = true;
+    document.getElementById('step10').style.display = 'block';
+    document.getElementById('step0').style.display = 'none';
     document.getElementById('roleToggle_row').hidden = false;
 
     const userId = Number(localStorage.getItem('userId') || 2); // استبدلها بالجلسة لاحقًا
@@ -195,8 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 async function loadCases(opts = {}) {
-    document.getElementById('step0').hidden = false;
-    document.getElementById('step10').hidden = true;
+    document.getElementById('step0').style.display = 'block';
+    document.getElementById('step10').style.display = 'none';
     document.getElementById('roleToggle_row').hidden = false;
 
 
@@ -227,27 +228,91 @@ async function loadCases(opts = {}) {
     renderPager();
 }
 
-function renderCasesTable(items) {
-    const body = document.querySelector('#casesTable tbody');
-    const empty = document.getElementById('casesEmpty');
-    body.innerHTML = '';
-    if (!items.length) { empty.hidden = false; return; }
-    empty.hidden = true;
+function personCard(p, idx, section) {
+    const div = document.createElement('div');
+    div.className = 'p-card';
 
-    items.forEach(it => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-      <td>${it.caseId ?? ''}</td>
-      <td>${it.applicantName ?? ''}</td>
-      <td>${it.idNumber ?? ''}</td>
-      <td>${it.altColName ?? ''}</td>
-      <td>${it.altSubColName ?? ''}</td>
-      <td>${it.date ?? ''}</td>
-    `;
-        tr.addEventListener('click', () => openCase(it._meta?.caseId));
-        body.appendChild(tr);
-    });
+    const id = p.ids?.[0] || {};
+    div.innerHTML = `
+    <h4>${p.name || '(بدون اسم)'} <span class="muted">• ${section === 'witnesses' ? 'شاهد' : section === 'authenticated' ? 'موكل' : 'مقدم طلب '}</span></h4>
+    <div class="p-meta">
+      <div>${p.job ? ('المهنة: ' + p.job) : ''}</div>
+      <div>${p.nationality ? ('الجنسية: ' + p.nationality) : ''}</div>
+      <div>${id.type ? ('الهوية: ' + id.type) : ''} ${id.number ? ('— ' + id.number) : ''}</div>
+      <div>${id.expiry ? ('انتهاء الصلاحية: ' + id.expiry) : ''}</div>
+    </div>
+    <div class="p-actions">
+      <button class="btn btn-sm btn-ghost" data-act="edit">تعديل</button>
+      <button class="btn btn-sm btn-danger" data-act="del">حذف</button>
+    </div>
+  `;
+    div.querySelector('[data-act="edit"]').onclick = () => openPartyModal(section, idx, p);
+    div.querySelector('[data-act="del"]').onclick = () => deleteParty(section, idx);
+    return div;
 }
+
+function renderCasesTable(items = []) {
+  const body = document.querySelector('#casesTable tbody');
+  const empty = document.getElementById('casesEmpty');
+  const mobile = document.getElementById('casesTableMobile');
+
+  if (body) body.innerHTML = '';
+  if (mobile) mobile.innerHTML = '';
+
+  const hasRows = Array.isArray(items) && items.length > 0;
+  if (empty) empty.hidden = hasRows;
+
+  if (!hasRows) return;
+
+  const esc = s => String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+  items.forEach(it => {
+    // ---- normalize fields ----
+    const caseId = it._meta?.caseId ?? it.caseId ?? it.CaseID ?? it.id ?? '';
+    const group  = it.altColName ?? it.group ?? it.mainGroup ?? '';
+    const type   = it.altSubColName ?? it.type ?? '';
+    const rawDt  = it.date ?? it.CreatedAt ?? it.createdAt ?? '';
+    const date   = (rawDt && String(rawDt).length >= 10) ? String(rawDt).slice(0,10) : String(rawDt || '');
+
+    // ---- desktop row ----
+    if (body) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${esc(caseId)}</td>
+        <td>${esc(group)}</td>
+        <td>${esc(type)}</td>
+        <td>${esc(date)}</td>
+      `;
+      tr.addEventListener('click', () => { if (caseId) openCase(caseId); });
+      body.appendChild(tr);
+    }
+
+    // ---- mobile card ----
+    if (mobile) {
+      const card = document.createElement('article');
+      card.className = 'm-case';
+      card.dir = 'rtl';
+      card.innerHTML = `
+        <div class="m-case-head">
+          <strong>قضية #${esc(caseId)}</strong>
+          <time>${esc(date)}</time>
+        </div>
+        <div class="m-case-meta">
+          <div><span class="k">المجموعة:</span> <span class="v">${esc(group) || '-'}</span></div>
+          <div><span class="k">النوع:</span> <span class="v">${esc(type) || '-'}</span></div>
+        </div>
+        <div class="m-case-actions">
+          <button class="btn btn-primary" type="button">فتح</button>
+        </div>
+      `;
+      card.querySelector('.btn')?.addEventListener('click', () => { if (caseId) openCase(caseId); });
+      mobile.appendChild(card);
+    }
+  });
+}
+
 
 function renderPager() {
     const pgInfo = document.getElementById('pgInfo');
@@ -639,42 +704,85 @@ function allowLeaveStep0(reason) {      // call this before leaving list
     step0ExitReason = reason || 'user';
 
 }
+// ---- drop-in replacement ----
+const STEP_RELOAD_GUARD_KEY = 'stepReloadGuard';
+const RELOADABLE_STEPS = new Set([2,3,4,5,6,7]);
+let __showStepBusy = false;
 
-function showStep(n) {
+async function showStep(n) {
+  n = Number(n);
 
+  if (__showStepBusy) {
+    console.warn('[showStep] blocked (busy), requested:', n);
+    
+    return;
+  }
+  __showStepBusy = true;
 
-    // hide all, show target
-    $$('section[id^="step"]').forEach(sec => sec.hidden = true);
-    const target = $(panelId(n));
+  // one-reload guard (consume only if it matches this step)
+  let justReloaded = false;
+  try {
+    const raw = sessionStorage.getItem(STEP_RELOAD_GUARD_KEY);
+    if (raw) {
+      const g = JSON.parse(raw);
+      if (g && g.step === n && (Date.now() - g.ts) < 10000) {
+        justReloaded = true;
+        sessionStorage.removeItem(STEP_RELOAD_GUARD_KEY);
+      }
+    }
+  } catch {}
+
+  // hide all, show target
+  document.querySelectorAll('section[id^="step"]').forEach(sec => sec.hidden = true);
+  const target = document.getElementById(`step${n}`) || (typeof panelId === 'function' ? document.querySelector(panelId(n)) : null);
+  if (target) target.hidden = false;
+  else console.warn('[showStep] panel not found for step', n);
+
+  // UI state
+  if (typeof highlightStepper === 'function') highlightStepper(n);
+  if (typeof set === 'function' && typeof LS !== 'undefined') set(LS.saved, String(n));
+  const roleRow = document.getElementById('roleToggle_row');
+  if (roleRow) roleRow.hidden = n > 0;
+  if(n > 0)
+  {
+        document.getElementById('step0').style.display = 'none';
+    document.getElementById('step10').style.display = 'none';
+  }
+  // run init (await if async)
+  try {
+    const inits = {
+      0: (typeof initStep0 === 'function') ? initStep0 : null,
+      1: (typeof initStep1 === 'function') ? initStep1 : null,
+      2: (typeof initStep2 === 'function') ? initStep2 : null,
+      3: (typeof initStep3 === 'function') ? initStep3 : null,
+      4: (typeof initStep4 === 'function') ? initStep4 : null,
+      5: (typeof initStep5 === 'function') ? initStep5 : null,
+      6: (typeof initStep6 === 'function') ? initStep6 : null,
+      7: (typeof initStep7 === 'function') ? initStep7 : null,
+    };
+    const fn = inits[n];
+    const ret = fn ? fn() : null;
+    if (ret && typeof ret.then === 'function') await ret;
+  } catch (e) {
+    console.error('[showStep] init error on step', n, e);
+  }
+
+  if (typeof syncMobileStepper === 'function') syncMobileStepper();
+
+  // make sure step 1 stays visible (paint next frame)
+  requestAnimationFrame(() => {
     if (target) target.hidden = false;
+  });
 
-    highlightStepper(n);
-    set(LS.saved, String(n));
-    if(n > 0)
-        document.getElementById('roleToggle_row').hidden = true;
-    else 
-        document.getElementById('roleToggle_row').hidden = false;
+  // reload policy: NEVER on 0–1; at most once on 2–7
+  if (RELOADABLE_STEPS.has(n) && !justReloaded) {
+    sessionStorage.setItem(STEP_RELOAD_GUARD_KEY, JSON.stringify({ step: n, ts: Date.now() }));
+    setTimeout(() => location.reload(), 50);
+  }
 
-    if (n === 0) initStep0();
-    if (n === 1) initStep1();
-    if (n === 2) initStep2();
-    if (n === 3) initStep3();
-    if (n === 4) initStep4();
-    if (n === 5) initStep5();
-    if (n === 6) initStep6();
-    if (n === 7) initStep7();
-
-    syncMobileStepper();
-
+  // unlock calls after a brief tick (avoid re-entrant flips)
+  setTimeout(() => { __showStepBusy = false; }, 150);
 }
-
-// document.addEventListener('DOMContentLoaded', () => {
-//     const saved = Number(localStorage.getItem(LS.saved) || 0); // default to list
-
-//     showStep(saved, { force: true });
-// });
-
-
 
 /* Allow clicking earlier steps to view them */
 function wireStepperClicks() {
@@ -688,12 +796,20 @@ function wireStepperClicks() {
     });
 }
 
-
 /* ========= RESET (عملية جديدة) if you add a button with this id ========= */
+$('#btnNewProcess10')?.addEventListener('click', () => {
+    const keep = new Set([LS.userId]); // preserve language & user id
+    Object.values(LS).forEach(k => { if (!keep.has(k)) del(k); });
+    
+    new_case = true;
+    showStep(1);
+});
+
 $('#btnNewProcess')?.addEventListener('click', () => {
     const keep = new Set([LS.userId]); // preserve language & user id
     Object.values(LS).forEach(k => { if (!keep.has(k)) del(k); });
-    showStep(0);
+    new_case = true;
+    showStep(1);
 });
 
 /* ========= STEP 2 (main/alt selection) ========= */
@@ -779,14 +895,19 @@ async function initStep0() {
     // keep step 1 disabled while on list
 
     set(LS.lang, '');
-    document.getElementById('roleToggle_row').hidden = false;
+    document.getElementById('roleToggle_row').style.display = 'flex';
     document.querySelector('.stepper-item[data-step="1"]')
         ?.setAttribute('disabled', '');
     let role = localStorage.getItem('role')
     if (role === 'employee') {
         if (typeof loadOfficeList === 'function') await loadOfficeList({});
+        document.getElementById('step10').style.display = 'block';
+        document.getElementById('step0').style.display = 'none';
+    
     } else {
         if (typeof loadCases === 'function') await loadCases({});
+        document.getElementById('step10').style.display = 'none';
+        document.getElementById('step0').style.display = 'block';
     }
 
 
@@ -837,20 +958,18 @@ function applyLangRadioFromLS() {
 async function initStep1() {
     // Read the stored language value (e.g., 'العربية' | 'الانجليزية' | 'ar' | 'en')
     const lang = get(LS.lang);
-    console.log('lang from LS:', lang);
-
     // If no language chosen yet, go to Step 0 (via showStep so UI state stays consistent)
-    if (lang == null || lang === '' || lang === 'null') {
+    if (!new_case && (lang == null || lang === '' || lang === 'null') ) {
         showStep(0);            // <- don't call initStep0() directly
         return;
     }
-
-
-    document.getElementById('roleToggle_row').hidden = true;
-
+    document.getElementById('roleToggle_row').style.display = 'none';
+    document.getElementById('step0').style.display = 'none';
+    document.getElementById('step10').style.display = 'none';
+    console.log('hide list');
     applyLangRadioFromLS();
 
-    // any other step-1 setup here (don’t call showStep(1) from here)
+    
 }
 
 
@@ -2223,6 +2342,78 @@ function updateNextBtnStep4() {
     // console.debug('[Step4] gate:', res);
 }
 
+// Render to BOTH views: table (desktop) and cards (mobile).
+function renderCases(rows = []) {
+  // Desktop
+  const tb = document.querySelector('#casesTable tbody');
+  const emptyDesktop = document.getElementById('casesEmpty');
+  if (tb) tb.innerHTML = rows.map(r => `
+    <tr data-id="${r.id}">
+      <td>${r.id ?? ''}</td>
+      <td>${r.group ?? ''}</td>
+      <td>${r.type ?? ''}</td>
+      <td>${r.date ?? ''}</td>
+    </tr>
+  `).join('');
+
+  const hasRows = rows.length > 0;
+  if (emptyDesktop) emptyDesktop.hidden = hasRows;
+
+  // Mobile cards
+  const cardsHost = document.getElementById('casesCards');
+  const emptyMobile = document.getElementById('casesEmptyMobile');
+  if (cardsHost) {
+    cardsHost.hidden = !hasRows;
+    cardsHost.innerHTML = rows.map(r => `
+      <article class="case-card" data-id="${r.id}" dir="rtl">
+        <header>
+          <div>قضية #${r.id ?? ''}</div>
+          <time datetime="${r.date ?? ''}">${r.date ?? ''}</time>
+        </header>
+        <div class="case-meta">
+          <div><strong>المجموعة:</strong> ${r.group ?? '-'}</div>
+          <div><strong>النوع:</strong> ${r.type ?? '-'}</div>
+        </div>
+        <div class="case-actions">
+          <button class="btn btn-ghost" data-action="open">فتح</button>
+          <button class="btn" data-action="continue">متابعة</button>
+        </div>
+      </article>
+    `).join('');
+  }
+  if (emptyMobile) emptyMobile.hidden = hasRows;
+
+  // Click handlers for mobile cards (open/continue)
+  cardsHost?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const card = btn.closest('.case-card');
+    const id = card?.getAttribute('data-id');
+    if (!id) return;
+    if (btn.dataset.action === 'open') {
+      // your open handler:
+      openCase?.(id);
+    } else if (btn.dataset.action === 'continue') {
+      // your continue flow:
+      openCase?.(id);
+      showStep?.(1);
+    }
+  }, { once:true }); // remove if you re-render frequently
+}
+
+// Example: mapping your existing row shape to {id, group, type, date}
+function mapRow(r) {
+  return {
+    id: r.CaseID ?? r.id,
+    group: r.mainGroup ?? r.group ?? r['المجموعة'],
+    type: r.altSubColName ?? r.type ?? r['النوع'],
+    date: r.CreatedAt?.slice(0,10) ?? r.date
+  };
+}
+
+// After fetching:
+/// const rows = data.rows.map(mapRow); renderCases(rows);
+
 
 // ===== Render cards =====
 function personCard(p, idx, section) {
@@ -3126,8 +3317,9 @@ function formatWitnessRow(p) {
 }
 
 // ---------- Step 6 initializer ----------
-async function initStep6() {
+async function initStep7() {
     console.log('→ initStep6');
+    
     document.querySelector('.stepper-item[data-step="6"]')?.removeAttribute('disabled');
 
     const caseId = Number(localStorage.getItem('caseId') || 0);
@@ -3157,7 +3349,7 @@ async function initStep6() {
     document.getElementById('caseLang')?.replaceChildren(document.createTextNode(docLang.startsWith('ar') ? 'العربية' : 'الإنجليزية'));
     document.getElementById('caseMainGroup')?.replaceChildren(document.createTextNode(main || '—'));
     document.getElementById('caseAltSub')?.replaceChildren(document.createTextNode(altSub || '—'));
-
+    
     // --- Party renderers ---
     function renderPartySection(sectionId, list, lineFn) {
         const wrap = document.getElementById(sectionId);
@@ -3241,9 +3433,9 @@ async function initStep6() {
 
     // --- Buttons ---
     document.getElementById('btnPrint')?.addEventListener('click', () => window.print());
-    document.getElementById('nextBtnStep6')?.addEventListener('click', (e) => {
+    document.getElementById('nextBtnStep7')?.addEventListener('click', (e) => {
         e.preventDefault();
-        showStep(7); // TODO: hook promote/submit API here
+        submitCase();
     });
 }
 
@@ -3265,7 +3457,7 @@ function addDaysISO(days) {
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
 }
-function validDateWithin7(dateStr) {
+function validDateWithin6(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr + 'T00:00:00');
     const min = new Date(todayISO() + 'T00:00:00');
@@ -3274,19 +3466,19 @@ function validDateWithin7(dateStr) {
 }
 function validTimeStr(t) { return /^\d{2}:\d{2}$/.test(t || ''); }
 
-function validateStep7() {
+function validateStep6() {
     const ack = document.getElementById('ackTerms').checked;
     const dateStr = document.getElementById('apptDate').value;
     const timeStr = document.getElementById('apptTime').value;
 
-    const dateOk = validDateWithin7(dateStr);
+    const dateOk = validDateWithin6(dateStr);
     const timeOk = validTimeStr(timeStr);
 
     document.getElementById('ackError').hidden = ack;
     document.getElementById('apptError').hidden = (dateOk && timeOk);
 
     const ok = ack && dateOk && timeOk;
-    document.getElementById('submitBtnStep7').disabled = !ok;
+    document.getElementById('submitBtnStep6').disabled = !ok;
     return ok;
 }
 
@@ -3316,14 +3508,14 @@ function renderHours(hours, selectedHour) {
                 document.querySelectorAll('.hour-btn.is-selected').forEach(el => el.classList.remove('is-selected'));
                 btn.classList.add('is-selected');
                 localStorage.setItem('apptHour', h.time);
-                validateStep7();
+                validateStep6();
             });
         }
         grid.appendChild(btn);
     });
 }
 
-function validateStep7() {
+function validateStep6() {
     const dateEl = document.getElementById('apptDate');
     const ack = document.getElementById('ackTerms');
     const submit = document.getElementById('submitBtn');
@@ -3351,10 +3543,10 @@ async function onDateChange() {
     if (!date) { renderHours([], null); validateStep7(); return; }
     const hours = await fetchHourAvailability(date);
     renderHours(hours, null);
-    validateStep7();
+    validateStep6();
 }
 
-function initStep7() {
+function initStep6() {
     const dateEl = document.getElementById('apptDate');
     const submit = document.getElementById('submitBtn');
     const ack = document.getElementById('ackTerms');
@@ -3372,28 +3564,25 @@ function initStep7() {
         dateEl.value = savedDate;
         fetchHourAvailability(savedDate).then(hours => {
             renderHours(hours, savedHour);
-            validateStep7();
+            validateStep6();
         });
     } else {
         renderHours([], null);
     }
 
     dateEl.addEventListener('change', onDateChange);
-    ack.addEventListener('change', validateStep7);
+    ack.addEventListener('change', validateStep6);
 
     submit.addEventListener('click', (e) => {
-        validateStep7();
+        validateStep6();
         if (submit.disabled) {
             e.preventDefault();
             return;
         }
-        // At this point you can:
-        // 1) Save into the case via API (recommended next step):
-        //    POST ./api_case_set_appt.php { caseId, date, hour }
-        // 2) Then proceed to final submit/next step.
+
     });
 
-    validateStep7();
+    validateStep6();
     submit.addEventListener('click', async (e) => {
         e.preventDefault();
         // ensure still valid (date, hour, terms)
@@ -3401,7 +3590,7 @@ function initStep7() {
         const dateOk = !!document.getElementById('apptDate').value;
         const hourOk = !!localStorage.getItem('apptHour');
         if (!dateOk || !hourOk || !ack.checked) return;
-        await submitCase();
+        showStep(7);
     });
 }
 
