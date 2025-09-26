@@ -43,14 +43,21 @@ nav a.active-link {
   /* no underline */
 }
 
+.container {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding: 16px;
+}
+
 
 /* Dashboard cards */
 #dashboard-main .card {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   /* adjust as you like */
   margin: 0 auto;
-  overflow: hidden;
+  overflow: auto;
+  
 }
 
 .card h2 {

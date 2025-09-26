@@ -40,7 +40,7 @@ fetch('../api_list_combo.php')
             window.comboData.diplomats = j.diplomats || [];
             window.comboData.settings = j.settings || [];
 
-            console.log("✅ Combo data loaded", window.comboData.settings);
+            console.log("✅ Combo data loaded", window.comboData);
         } else {
             console.error("❌ Failed to load combo data", j.error);
         }
@@ -788,14 +788,17 @@ function apiResolve(path) {
             const isEnglish = (lang === 'الانجليزية');
             const textAlign = isEnglish ? 'left' : 'right';
             const dir = isEnglish ? 'ltr' : 'rtl';
+            const index = window.comboData.settings[0].VCIndesx;
             if (isEnglish) {
-                signer = get(LS.en_diplomat);
-                signer_role = get(LS.en_diplomat_job);
+                signer = window.comboData.diplomats[index].EngEmployeeName;
+                signer_role = window.comboData.diplomats[index].AuthenticTypeEng
+
             }
             else {
-                signer = get(LS.ar_diplomat);
-                signer_role = get(LS.ar_diplomat_job);
+                signer = window.comboData.diplomats[index].EmployeeName;
+                signer_role = window.comboData.diplomats[index].AuthenticType
             }
+            console.log(signer, signer_role);
             [empText, authenticater_text].forEach(el => {
                 el.style.textAlign = textAlign;
                 el.setAttribute('dir', dir);
@@ -2225,6 +2228,7 @@ async function buildPayloadFromUI() {
 
     const witnesses = window.universalappState.witnesses || [];
     const applicants = window.universalappState.applicants || [];
+    
     const text = document.getElementById('empText').value;
     const group = window.universalappState.selected.mainGroup;
     const lang = window.universalappState.lang;
@@ -2250,12 +2254,9 @@ async function buildPayloadFromUI() {
     if (missionDetails.missionPostal) footerParts.push(`الرمز البريدي: ${missionDetails.missionPostal}`);
     let footerText = footerParts.join("    ");
 
-
-
-    let payload = {
-        "missionNameAr": missionDetails.missionNameAr,
-        "missionNameEn": missionDetails.missionNameEn,
-        "logo_png": "logo.jpg",   // optional
+    
+    console.log(applicants[0].name);
+    let payload = {        
         footer_text: footerText,
         barcode_png: missionDetails.barcodeEnabled ? qrDataUrl : 'no data',
         "lang": lang,
@@ -2263,9 +2264,10 @@ async function buildPayloadFromUI() {
         "docxfile": "SingleAuth.docx",
         "رقم_المعاملة": doc_id,
         "التاريخ_الميلادي": todayDDMMYYYY(),
-        "مقدم_الطلب": applicants[0]?.name || "",
+        "مقدم_الطلب": applicants[0].name,
         "نص_المعاملة": text,
         "text": text,
+        "النص.":text,
         "التوثيق": authenticater_text.value,
         "مدة_الاعتماد": "",
         "صفة_الموقع": signer_role,
@@ -2307,16 +2309,20 @@ async function generateAndDownloadDoc(payload) {
     }
 
     // 3. Download result
+    const applicants = window.universalappState.applicants || [];
+    
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = (payload["نوع_المكاتبة"] || "document") +
-                 " " + (payload["مقدم_المطلب"] || "") +
+                 " " + applicants[0].name; +
                  "." + payload["output_format"];
     document.body.appendChild(a);
     a.click();
     a.remove();
+    
+
     URL.revokeObjectURL(url);
 
     // showStep(0);

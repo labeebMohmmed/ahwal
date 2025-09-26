@@ -155,6 +155,7 @@ async function loadOfficeList(params = {}) {
     const userId = Number(localStorage.getItem('userId') || 2); // استبدلها بالجلسة لاحقًا
 
     const qs = new URLSearchParams(params).toString();
+    // console.log(qs);
     const res = await fetch('api_office_cases_list.php?' + qs);
     if (!res.ok) { alert('فشل تحميل القائمة'); return; }
     const data = await res.json();
@@ -210,7 +211,7 @@ async function loadOfficeList(params = {}) {
     });
 
 
-    
+
 
 
 
@@ -230,13 +231,13 @@ async function loadOfficeList(params = {}) {
 // });
 
 document.addEventListener("DOMContentLoaded", () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const group = urlParams.get("group");
-        const id = urlParams.get("id");
-        console.log(id, group);
-        openOfficeCase(Number(id), group);
-        
-    });
+    const urlParams = new URLSearchParams(window.location.search);
+    const group = urlParams.get("group");
+    const id = urlParams.get("id");
+    console.log(id, group);
+    openOfficeCase(Number(id), group);
+
+});
 
 async function loadCases(opts = {}) {
     document.getElementById('step0').style.display = 'block';
@@ -384,7 +385,7 @@ async function openOfficeCase(officeId, MainGroup = 'توكيل', go_to_one = tr
     if (!res.ok) { return; }
 
     const data = await res.json();
-
+    console.log(data);
     // keep your existing state fill
 
     appState = {
@@ -819,9 +820,9 @@ async function showStep(n) {
     const step0 = document.getElementById('step0');
     const step10 = document.getElementById('step10');
     if (n > 0) {
-        if(step0)
+        if (step0)
             step0.style.display = 'none';
-        if(step10)
+        if (step10)
             step10.style.display = 'none';
     }
     // run init (await if async)
@@ -941,7 +942,7 @@ function checkMixedLanguages() {
         const examples = minorityWords.slice(0, 3).join(", ");
 
         inform_user.innerText =
-            `⚠️ هذا النص يحتوي على كلمات بالعربية والانجليزية ` +            
+            `⚠️ هذا النص يحتوي على كلمات بالعربية والانجليزية ` +
             `مثل  ${minorityLang}: ${examples}`;
 
         inform_user.style.display = 'flex';
@@ -1462,7 +1463,7 @@ async function resolveModelIdFromAltPair(debug = false) {
     }
 
     if (!res.ok) {
-        
+
         setTimeout(() => { try { showStep(2); } catch { } }, 0);
         return null;
     }
@@ -2121,8 +2122,8 @@ function renderUploadsGallery(items) {
         if (get('role') === 'employee') {
             fileUrl = `./api_office_casefile_get.php?fileId=${encodeURIComponent(it.FileID)}`;
         }
-
-        if (kind.startsWith('image/') || kind.includes('jpeg') || kind.endsWith('jpg') || kind.endsWith('png')) {
+        console.log(kind);
+        if (kind.startsWith('image/') || kind.includes('jpeg') || kind.endsWith('jpg') || kind.startsWith('.jpg') || kind.endsWith('png')) {
             const img = document.createElement('img');
             img.loading = 'eager';
             img.decoding = 'async';
@@ -2455,18 +2456,20 @@ function validatePersonDetailed(section, p, requirements) {
             errors.pf_id_number = 'رقم الهوية مطلوب.';
             list.push('رقم الهوية مطلوب.');
         }
-        if (!id.issuer) {
-            errors.pf_id_type = 'مكان الإصدار مطلوب.';
-            list.push('مكان الإصدار مطلوب.');
-        } else {
-            // language constraint
-            if (arabicDocLang() && /[A-Za-z]/.test(id.issuer)) {
-                errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف العربية.';
-                list.push('مكان الإصدار يجب أن يكون بالحروف العربية.');
-            }
-            if (!arabicDocLang() && /[\u0600-\u06FF]/.test(id.issuer)) {
-                errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف الانجليزية.';
-                list.push('مكان الإصدار يجب أن يكون بالحروف الانجليزية.');
+        if (section !== 'authenticated') {
+            if (!id.issuer) {
+                errors.pf_id_type = 'مكان الإصدار مطلوب.';
+                list.push('مكان الإصدار مطلوب.');
+            } else {
+                // language constraint
+                if (arabicDocLang() && /[A-Za-z]/.test(id.issuer)) {
+                    errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف العربية.';
+                    list.push('مكان الإصدار يجب أن يكون بالحروف العربية.');
+                }
+                if (!arabicDocLang() && /[\u0600-\u06FF]/.test(id.issuer)) {
+                    errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف الانجليزية.';
+                    list.push('مكان الإصدار يجب أن يكون بالحروف الانجليزية.');
+                }
             }
         }
 

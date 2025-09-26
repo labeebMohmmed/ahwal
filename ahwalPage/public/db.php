@@ -1,16 +1,6 @@
 <?php
 declare(strict_types=1);
 
-/* ---------------------------------------------------------
-   اتصال موحّد بـ SQL Server مع دعم تعدد قواعد البيانات.
-   الاستخدام:
-     $pdo = db();                  // القاعدة الافتراضية
-     $pdo2 = db('ReportsDB');      // قاعدة أخرى بالاسم
-   المزايا:
-     - كاش اتصال لكل قاعدة (لا يعاد فتح الاتصال)
-     - قراءة الإعدادات من ENV أو ملف INI بأقسام متعددة
----------------------------------------------------------- */
-
 /* تحميل ملف INI اختياري: ضع إعداداتك في أقسام */
 $iniFile = __DIR__ . '/config.local.ini';  // لا ترفعه للمستودع
 $INI = is_file($iniFile) ? parse_ini_file($iniFile, true, INI_SCANNER_TYPED) : [];
@@ -25,25 +15,31 @@ function cfg_ini_section(array $ini, string $section): array {
 function db(?string $dbname = null): PDO {
     static $POOL = [];
 
-    $def = cfg_ini_section($GLOBALS['INI'], 'default');
+    // Read from INI sections if you have them, else env, else sane defaults:
+    $def = function_exists('cfg_ini_section') ? cfg_ini_section($GLOBALS['INI'], 'default') : [];
+    $sec = [];
+    if ($dbname && function_exists('cfg_ini_section')) {
+        $sec = cfg_ini_section($GLOBALS['INI'], $dbname) ?: cfg_ini_section($GLOBALS['INI'], strtolower($dbname)) ?: [];
+    }
 
-    $name = $dbname ?: ($def['NAME'] ?? cfg_env('DB_NAME', 'AhwalDataBase'));
+    // --- Defaults aligned with your Python string ---
+    $server = $sec['SERVER'] ?? $def['SERVER'] ?? getenv('DB_SERVER') ?: '192.168.100.67,49149';
+    $name   = $sec['NAME']   ?? $def['NAME']   ?? getenv('DB_NAME')   ?: ($dbname ?: 'AhwalDataBase');
+    $user   = $sec['USER']   ?? $def['USER']   ?? getenv('DB_USER')   ?: 'SQLSerAdmin';
+    $pass   = $sec['PASS']   ?? $def['PASS']   ?? getenv('DB_PASS')   ?: 'sqlSER@jed80';
 
-    $sec = cfg_ini_section($GLOBALS['INI'], $dbname ?? '');
-    if (!$sec && $dbname) { $sec = cfg_ini_section($GLOBALS['INI'], strtolower($dbname)); }
+    // Python had Trusted_Connection=no → SQL auth. No direct PDO flag; just pass user/pass.
+    // Encryption defaults: Python example didn’t specify, so make it off by default:
+    $enc    = $sec['ENCRYPT'] ?? $def['ENCRYPT'] ?? getenv('DB_ENCRYPT') ?: 'no';   // 'yes' or 'no'
+    $tsc    = $sec['TSC']     ?? $def['TSC']     ?? getenv('DB_TSC')     ?: 'yes';  // TrustServerCertificate
 
-    // إعدادات الاتصال
-    $server = $sec['SERVER'] ?? $def['SERVER'] ?? cfg_env('DB_SERVER', 'localhost');  // ← مطابق لقديمك
-    $user   = $sec['USER']   ?? $def['USER']   ?? cfg_env('DB_USER',   '');           // ← فارغ = Integrated
-    $pass   = $sec['PASS']   ?? $def['PASS']   ?? cfg_env('DB_PASS',   '');           // ← فارغ = Integrated
-    $enc    = $sec['ENCRYPT']?? $def['ENCRYPT']?? cfg_env('DB_ENCRYPT','yes');
-    $tsc    = $sec['TSC']    ?? $def['TSC']    ?? cfg_env('DB_TSC',    'yes');
-    $name   = $sec['NAME']   ?? $name;
+    // If caller explicitly passed a DB name, prefer that over env:
+    if ($dbname) $name = $dbname;
 
-    $key = md5(json_encode([$server,$name,$user===''?'#I#':$user,$enc,$tsc], JSON_UNESCAPED_UNICODE));
+    $key = md5(json_encode([$server,$name,$user,$enc,$tsc], JSON_UNESCAPED_UNICODE));
     if (isset($POOL[$key]) && $POOL[$key] instanceof PDO) return $POOL[$key];
 
-    // DSN مطابق لأسلوبك القديم
+    // Build DSN. sqlsrv accepts "Server=host,port"
     $dsn = "sqlsrv:Server={$server};Database={$name};Encrypt={$enc};TrustServerCertificate={$tsc};";
 
     $options = [
@@ -55,21 +51,17 @@ function db(?string $dbname = null): PDO {
         $options[PDO::SQLSRV_ATTR_ENCODING] = PDO::SQLSRV_ENCODING_UTF8;
     }
 
-    // إذا لم يوجد اسم مستخدم وكلمة مرور → استخدم Integrated (مثل new PDO($dsn, null, null, …))
-    $useIntegrated = ($user === '' && $pass === '');
-
     try {
-        $pdo = $useIntegrated
-            ? new PDO($dsn, null, null, $options)   // Windows/Integrated auth
-            : new PDO($dsn, $user, $pass, $options); // SQL auth (UID/PWD)
+        // SQL authentication (since user/pass provided)
+        $pdo = new PDO($dsn, $user, $pass, $options);
     } catch (Throwable $e) {
-        // سجل معلومات مفيدة دون كلمة المرور
-        error_log("[DB] Connect failed: server={$server}; db={$name}; integrated=" . ($useIntegrated?'yes':'no') . "; err=" . $e->getMessage());
+        error_log("[DB] Connect failed: server={$server}; db={$name}; user={$user}; enc={$enc}; tsc={$tsc}; err=".$e->getMessage());
         throw $e;
     }
 
     return $POOL[$key] = $pdo;
 }
+
 
 
 /* استجابة JSON موحّدة */

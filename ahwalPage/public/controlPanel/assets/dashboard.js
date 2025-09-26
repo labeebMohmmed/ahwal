@@ -82,7 +82,7 @@ fetch('../api_list_combo.php')
             window.comboData.diplomats = j.diplomats || [];
             window.comboData.settings = j.settings || [];
 
-            console.log("✅ Combo data loaded", window.comboData.settings);
+            console.log("✅ Combo data loaded", window.comboData);
         } else {
             console.error("❌ Failed to load combo data", j.error);
         }
@@ -762,7 +762,7 @@ function officeCasesControl(main) {
                   <thead>
                     <tr>
                       <th>الرقم</th>
-                      <th>اسم مقدم الطلب</th>                      
+                      <th style="max-width:250px;>اسم مقدم الطلب</th>                      
                       <th>المجموعة</th>
                       <th>التاريخ</th>
                       <th>الحالة</th>
@@ -776,7 +776,7 @@ function officeCasesControl(main) {
                 html += `
                   <tr>
                     <td>${c.OfficeNumber || ""}</td>
-                    <td>${c.ApplicantName || ""}</td>                    
+                    <td >${c.ApplicantName || ""}</td>                    
                     <td>${c.MainGroup || ""}</td>
                     <td>${c.Date || ""}</td>
                     <td>${c.StatusTag || c.ArchStatus || ""}</td>
@@ -844,18 +844,20 @@ function consularDocsControl(main) {
         }
 
         let html = `
-        <table class="table">
-            <thead>
-            <tr>
-                <th>الرقم</th>
-                <th>اسم مقدم الطلب</th>
-                <th>التاريخ</th>
-                <th>المجموعة</th>
-                <th>الحالة</th>
-                <th>الطريقة</th>
-                <th>الإجراءات</th>
-            </tr>
-            </thead>
+       <table class="table" style=" width: 100%; border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th>الرقم</th>
+            <th style="width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                اسم مقدم الطلب
+            </th>
+            <th>التاريخ</th>
+            <th>المجموعة</th>
+            <th>الحالة</th>
+            <th>الطريقة</th>
+            <th>الإجراءات</th>
+        </tr>
+    </thead>
             <tbody>
         `;
 
@@ -943,8 +945,8 @@ function consularDocsControl(main) {
                 const id = btn.dataset.id;
                 const group = btn.dataset.group;
                 console.log("edit-app clicked:", group, id); // ✅ will log values now
-                alert("❌ API Error: " + group + id);
-                window.location.href = `http://192.168.0.68:8000/index.php?group=${encodeURIComponent(group)}&id=${encodeURIComponent(id)}`;
+                // alert("❌ API Error: " + group + id);
+                window.location.href = `http://192.168.100.100:8000/index.php?group=${encodeURIComponent(group)}&id=${encodeURIComponent(id)}`;
             });
         });
 

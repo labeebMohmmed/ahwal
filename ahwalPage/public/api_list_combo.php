@@ -29,12 +29,13 @@ try {
         }
     }
 
+    //select distinct EmployeeName from TableUser where EmployeeName is not null and الدبلوماسيون = N'yes' and Aproved like N'%أكده%' order by EmployeeName asc
     // --- 2) TableUser (diplomats)
-    $sqlDip = "  SELECT DISTINCT EmployeeName, EngEmployeeName, AuthenticType, AuthenticTypeEng
+    $sqlDip = "  SELECT DISTINCT EmployeeName, EngEmployeeName, JobPosition as AuthenticType, AuthenticTypeEng
                FROM dbo.TableUser
                WHERE EmployeeName IS NOT NULL
                  AND الدبلوماسيون = N'yes'
-                 AND (Aproved LIKE N'%أكده%' or Aproved LIKE N'%نشط%')
+                 AND (Aproved LIKE N'%أكده%')
                ORDER BY EmployeeName ASC";
     $rowsDip = $pdo->query($sqlDip)->fetchAll(PDO::FETCH_ASSOC);
 
