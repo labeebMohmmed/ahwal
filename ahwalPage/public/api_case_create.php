@@ -27,6 +27,7 @@ $partyBase = [
   'authenticated' => [],
   'witnesses'     => [],
   'contact'       => ['phone'=>'', 'email'=>'']
+  
 ];
 $detailsModelBlock = [
   'id'          => $modelId,

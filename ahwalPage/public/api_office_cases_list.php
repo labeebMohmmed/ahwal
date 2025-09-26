@@ -4,7 +4,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-
+require __DIR__ . '/db.php';
 function jerr($msg, $extra = []) {
   http_response_code(500);
   echo json_encode(['ok'=>false,'error'=>$msg] + $extra, JSON_UNESCAPED_UNICODE);
@@ -22,11 +22,7 @@ try {
   $todayOnly= ($_GET['todayOnly'] ?? '') === '1';
   $debug    = ($_GET['debug'] ?? '') === '1';
 
-  $dsn = "sqlsrv:Server=localhost;Database=AhwalDataBase;Encrypt=yes;TrustServerCertificate=yes";
-  $pdo = new PDO($dsn, null, null, [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-  ]);
+  $pdo = db();
 
   // Check if view exists
   $hasView = false;
@@ -64,7 +60,7 @@ try {
       FROM dbo.TableAuth A
       UNION ALL
       SELECT N'Collection', C.id, C.[رقم_المعاملة],
-             N'غير ذلك', 10,
+             C.[نوع_المعاملة], 10,
              C.[مقدم_الطلب], C.[رقم_الهوية],
              C.[التاريخ_الميلادي], C.[حالة_الارشفة], C.[طريقة_الطلب],
              CASE LTRIM(RTRIM(C.[حالة_الارشفة]))

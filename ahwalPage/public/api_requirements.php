@@ -20,12 +20,16 @@ try {
     // ---- 3) Query ----
     // We only need المطلوب_رقم1..9 from dbo.TableProcReq where ModelID = ?
     $sql = "
-        SELECT
-            [المطلوب_رقم1], [المطلوب_رقم2], [المطلوب_رقم3],
-            [المطلوب_رقم4], [المطلوب_رقم5], [المطلوب_رقم6],
-            [المطلوب_رقم7], [المطلوب_رقم8], [المطلوب_رقم9]
-        FROM [dbo].[TableProcReq]
-        WHERE [ModelID] = ?
+        SELECT p.[المطلوب_رقم1], p.[المطلوب_رقم2], p.[المطلوب_رقم3],
+                    p.[المطلوب_رقم4], p.[المطلوب_رقم5], p.[المطلوب_رقم6],
+                    p.[المطلوب_رقم7], p.[المطلوب_رقم8], p.[المطلوب_رقم9]
+        FROM dbo.TableAddModel AS m
+        LEFT JOIN dbo.TableProcReq AS p
+        ON p.المعاملة COLLATE Arabic_100_CI_AI_KS
+            = (m.altColName COLLATE Arabic_100_CI_AI_KS
+                + N'-'
+                + m.altSubColName COLLATE Arabic_100_CI_AI_KS)
+        where m.id = ?
     ";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$modelId]);

@@ -13,11 +13,8 @@
 
 </head>
 <body>
-  <!-- BODY CONTENT STARTS HERE (leave existing site header/footer alone) -->
-<a href="/ahwal-admin/admin.php" class="fab-admin" aria-label="لوحة التحكم">
-  ⚙️ لوحة التحكم
-</a>
-<button id="btnNewProcess" class="fab-admin left">معاملة جديدة</button>
+
+
 
 <div id="roleToggle_row" class="toolbar-row" style="gap:12px;align-items:center;justify-content:space-between;margin:8px 0 12px;" >
   <label class="muted" style="display:flex;align-items:center;gap:8px;">
@@ -87,12 +84,14 @@
 </nav>
 
 <section id="step10" class="card" style="max-width: 80%" dir="rtl" hidden>
-  <h2 class="card-title">طلبات المكتب</h2>
-  <div class="toolbar">
-    <input id="q" class="input" placeholder="ابحث بالرقم أو الاسم">
-    <select id="mg"><option value="">كل المجموعات</option><option>توكيل</option><option>غير ذلك</option></select>
-    <input id="from" type="date"><input id="to" type="date">
-    <button id="searchBtn" class="btn">بحث</button>
+  <h2 class="card-title">قائمة المعاملات</h2>
+  <div class="field-block" style="flex-wrap:wrap;">
+    <input id="q" class="input" style="width: 130px; margin: 5px"  placeholder="ابحث بالرقم أو الاسم">
+    <select id="mg" style="width: 120px; margin: 5px" ><option value="">كل المجموعات</option><option>توكيل</option><option>غير ذلك</option></select>
+    <input id="from" style="width: 135px; margin: 5px" type="date">
+    <input id="to" style="width: 135px; margin: 5px" type="date">
+    <button id="searchBtn" style="width: 50px; margin: 5px"  class="btn">بحث</button>
+    <button id="btnNewProcess10" class="btn">معاملة جديدة</button>
   </div>
   <div id="autoTodayNote" class="muted" hidden>تم عرض طلبات اليوم فقط لكثرة النتائج.</div>
   <table class="table">
@@ -101,6 +100,8 @@
     </tr></thead>
     <tbody id="officeBody"></tbody>
   </table>
+  <div class="table-mobile" id="casesOfficeTableMobile" >
+    </div> 
 </section>
 
 
@@ -108,20 +109,18 @@
   <h2 class="card-title">قائمة الطلبات</h2>
 
   <div class="field-block" style="flex-wrap:wrap;">
-    <input id="fltCaseId" class="input" style="width: 120px; margin: 5px" type="text" placeholder="رقم القضية"/>
-    <input id="fltName"   class="input" style="width: 150px; margin: 5px" type="text" placeholder="اسم مقدم الطلب"/>
+    <input id="fltCaseId" class="input" style="width: 120px; margin: 5px" type="text" placeholder="رقم الملف"/>    
     <input id="fltFrom"   class="input" style="width: 135px; margin: 5px" type="date" />
     <input id="fltTo"     class="input" style="width: 135px; margin: 5px" type="date" />
     <button id="btnSearch" class="btn">بحث</button>
+    <button id="btnNewProcess" class="btn">معاملة جديدة</button>
   </div>
 
   <div class="table-wrap">
     <table class="table" id="casesTable" aria-label="قائمة الطلبات">
       <thead>
         <tr>
-          <th>رقم</th>
-          <th>الاسم</th>
-          <th>رقم الهوية</th>
+          <th>رقم</th>          
           <th>المجموعة</th>
           <th>النوع</th>
           <th>التاريخ</th>
@@ -129,6 +128,10 @@
       </thead>
       <tbody></tbody>
     </table>
+    <div class="table-mobile" id="casesTableMobile">
+      
+     
+    </div>    
     <div id="casesEmpty" class="empty" hidden>لا توجد نتائج.</div>
   </div>
 
@@ -263,7 +266,7 @@
 
   <!-- Applicants -->
   <div class="party-section">
-    <div class="party-head">
+    <div class="party-head" >
       <div class="party-title">مقدم الطلب</div>
       <button id="btnAddApplicant" type="button" class="btn btn-primary btn-sm">+ إضافة متقدم</button>
     </div>
@@ -381,13 +384,13 @@
   </div>
 </div>
 
-<section id="step5" class="card" dir="rtl" hidden>
+<section id="step5" name="step5Feilds" class="card" dir="rtl" hidden>
   <h2 class="card-title">تفاصيل الطلب</h2>
 
   <!-- Role toggle (testing only) -->
 
 
-  <p class="muted">أكمل الحقول التالية حسب نوع المعاملة.</p>
+  <p class="muted" id="fieldsNames" style="display: none">أكمل الحقول التالية حسب نوع المعاملة.</p>
 
   <!-- ✅ The form is always present for both roles -->
   <form id="step5Form" class="form-grid">
@@ -412,8 +415,11 @@
     </div>
 
     
-
+    
     <textarea id="empText" dir="rtl" style="width:100%;min-height:220px;padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:8px;"></textarea>
+    <span id="inform-user" style="disp[lay:none"></span>
+    <h3 style="margin-top: 20px;font-size:1.05rem;">الموثق:</h3>
+    <textarea id="authenticater_text" dir="rtl" style=" width:100%;min-height:70px;padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:8px;"></textarea>
 
     <p class="muted" style="margin-top:8px;">ملاحظات:</p>
       <p class="muted" style="margin-top:8px;">
@@ -423,75 +429,22 @@
       التعديل في اسماء جميع الاطراف المتعلقة بالمكاتبة لا يعتد بها وسيتم استخدام الاسماء التي تم ادخالها في نافذة البيانات الشخصية
     </p>
   </div>
+  <h3 style="margin-top: 20px;font-size:1.05rem;">اضافة تعليق:</h3>
+    <textarea id="comment_text" dir="rtl" style=" width:100%;min-height:70px;padding:10px;border:1px solid var(--border,#e5e7eb);border-radius:8px;"></textarea>
+
 
   <div class="footer-actions">
-    <button id="nextBtnStep5Emp" class="btn btn-primary">التالي</button>
+    <button id="nextBtnStep5Emp" class="btn btn-primary">طباعة المستند</button>
   </div>
 </section>
 
 
-<!-- Step 6: Review + Print -->
+
 <section id="step6" class="card" dir="rtl" hidden>
-  <h2 class="card-title">المراجعة والطباعة</h2>
-
-  <div id="caseHeader" class="case-header">
-    
-    <div class="meta">
-      <div><strong>التاريخ:</strong> <span id="caseDate">—</span></div>
-      <div><strong>اللغة:</strong> <span id="caseLang">—</span></div>
-      <div><strong>المجموعة:</strong> <span id="caseMainGroup">—</span></div>
-      <div><strong>النوع:</strong> <span id="caseAltSub">—</span></div>
-    </div>
-    <div class="case-id-block">
-      <div class="uid-label">رقم المعاملة</div>
-      <div id="caseUid" class="uid-value">—</div>
-      <svg id="caseBarcode" class="barcode"></svg>
-    </div>
-  </div>
-
-  <hr/>
-    <div style="text-align: center;"><strong>يجب مراجعة صالة خدمات الجمهور خلال فترة لا تتجاوز (7) ايام من تاريخ تسليم المعاملة</strong></div>
-    <div class="review-section">
-    <h3>مقدم الطلب:</h3>
-    <div id="reviewApplicants" class="party-review"></div>
-    </div>
-
-    <div class="review-section" id="secAuth" hidden>
-    <h3>الموكَّل:</h3>
-    <div id="reviewAuth" class="party-review"></div>
-    </div>
-
-    <div class="review-section" id="secWitness" hidden>
-    <h3>الشاهدان:</h3>
-    <div id="reviewWitnesses" class="party-review"></div>
-    </div>
-
-
-  <div class="review-section">
-    <h3>البيانات المطلوبة:</h3>
-    <div id="reviewAnswers" class="answers-grid"></div>
-  </div>
-
-  <div class="review-section">
-    <h3>المستندات المرفوعة (يجب احضارها عند المراجعة):</h3>
-    <div id="reviewFiles" class="files-grid"></div>
-  </div>
-
-  <div class="footer-actions">
-    <button id="btnPrint" class="btn">طباعة / حفظ PDF</button>
-    <button id="nextBtnStep6" class="btn btn-primary">الإرسال</button>
-  </div>
-  <div class="review-section">
-    <h3>العنوان</h3>
-    <div id="office-Addres" class="files-grid">القنصلية العامة لجمهورية السودان بجدة، حي النهضة</div>
-  </div>
-</section>
-
-<section id="step7" class="card" dir="rtl" hidden>
   <h2 class="card-title">الإرسال</h2>
   <p class="muted">اختر تاريخ الموعد والساعة، ثم الموافقة على الشروط لإرسال الطلب.</p>
 
-  <form id="step7Form" class="form-grid" novalidate>
+  <form id="step6Form" class="form-grid" novalidate>
     <!-- Date -->
     <div class="field">
       <label for="apptDate">تاريخ الموعد *</label>
@@ -525,9 +478,126 @@
   </form>
 
   <div class="footer-actions">
-    <button id="submitBtn" class="btn btn-primary" disabled>إرسال</button>
+    <button id="submitBtn" class="btn btn-primary" disabled>المتابعة</button>
   </div>
 </section>
+
+<!-- Step 6: Review + Print -->
+<section id="step7" class="card" dir="rtl" hidden>
+  <h2 class="card-title">المراجعة والطباعة</h2>
+
+  <div id="caseHeader" class="case-header">
+    
+    <div class="meta">
+      <div><strong>التاريخ:</strong> <span id="caseDate">—</span></div>
+      <div><strong>اللغة:</strong> <span id="caseLang">—</span></div>
+      <div><strong>المجموعة:</strong> <span id="caseMainGroup">—</span></div>
+      <div><strong>النوع:</strong> <span id="caseAltSub">—</span></div>
+    </div>
+    <div class="case-id-block">
+      <div class="uid-label">رقم المعاملة</div>
+      <div id="caseUid" class="uid-value">—</div>
+      <svg id="caseBarcode" class="barcode"></svg>
+    </div>
+  </div>
+
+  <hr/>
+    <div style="text-align: center;"><strong>يجب مراجعة صالة خدمات الجمهور خلال فترة لا تتجاوز (7) ايام من التاريخ الموضح أعلاه وخلال الفترة الزمنية التي تم اختيارها </strong></div>
+    <div class="review-section">
+    <h3>مقدم الطلب:</h3>
+    <div id="reviewApplicants" class="party-review"></div>
+    </div>
+
+    <div class="review-section" id="secAuth" hidden>
+    <h3>الموكَّل:</h3>
+    <div id="reviewAuth" class="party-review"></div>
+    </div>
+
+    <div class="review-section" id="secWitness" hidden>
+    <h3>الشاهدان:</h3>
+    <div id="reviewWitnesses" class="party-review"></div>
+    </div>
+
+
+  <div class="review-section">
+    <h3>البيانات المطلوبة:</h3>
+    <div id="reviewAnswers" class="answers-grid"></div>
+  </div>
+
+  <div class="review-section">
+    <h3>المستندات المرفوعة (يجب احضارها عند المراجعة):</h3>
+    <div id="reviewFiles" class="files-grid"></div>
+  </div>
+
+  <div class="footer-actions">
+    <button id="btnPrint" class="btn">طباعة / حفظ PDF</button>
+    <button id="nextBtnStep7" class="btn btn-primary">تسليم الطلب</button>
+  </div>
+  <div class="review-section">
+    <h3>العنوان</h3>
+    <div id="office-Addres" class="files-grid">القنصلية العامة لجمهورية السودان بجدة، حي النهضة</div>
+  </div>
+</section>
+
+<section id="step7" class="card" dir="rtl" hidden>
+  <h2 class="card-title">المراجعة والطباعة</h2>
+
+  <div id="caseHeader" class="case-header">
+    
+    <div class="meta">
+      <div><strong>التاريخ:</strong> <span id="caseDate">—</span></div>
+      <div><strong>اللغة:</strong> <span id="caseLang">—</span></div>
+      <div><strong>المجموعة:</strong> <span id="caseMainGroup">—</span></div>
+      <div><strong>النوع:</strong> <span id="caseAltSub">—</span></div>
+    </div>
+    <div class="case-id-block">
+      <div class="uid-label">رقم المعاملة</div>
+      <div id="caseUid" class="uid-value">—</div>
+      <svg id="caseBarcode" class="barcode"></svg>
+    </div>
+  </div>
+
+  <hr/>
+    <div style="text-align: center;"><strong>يجب مراجعة صالة خدمات الجمهور خلال فترة لا تتجاوز (7) ايام من التاريخ الموضح أعلاه وخلال الفترة الزمنية التي تم اختيارها </strong></div>
+    <div class="review-section">
+    <h3>مقدم الطلب:</h3>
+    <div id="reviewApplicants" class="party-review"></div>
+    </div>
+
+    <div class="review-section" id="secAuth" hidden>
+    <h3>الموكَّل:</h3>
+    <div id="reviewAuth" class="party-review"></div>
+    </div>
+
+    <div class="review-section" id="secWitness" hidden>
+    <h3>الشاهدان:</h3>
+    <div id="reviewWitnesses" class="party-review"></div>
+    </div>
+
+
+  <div class="review-section">
+    <h3>البيانات المطلوبة:</h3>
+    <div id="reviewAnswers" class="answers-grid"></div>
+  </div>
+
+  <div class="review-section">
+    <h3>المستندات المرفوعة (يجب احضارها عند المراجعة):</h3>
+    <div id="reviewFiles" class="files-grid"></div>
+  </div>
+
+  <div class="footer-actions">
+    <button id="btnPrint" class="btn">طباعة / حفظ PDF</button>
+    <button id="nextBtnStep7" class="btn btn-primary">تسليم الطلب</button>
+  </div>
+  <div class="review-section">
+    <h3>العنوان</h3>
+    <div id="office-Addres" class="files-grid">القنصلية العامة لجمهورية السودان بجدة، حي النهضة</div>
+  </div>
+</section>
+<div id="qrPreview" style="direction:ltr; text-align:right; margin-top:12px; display: flex;"></div>
+
+
+
 
 <script src="static/app.js"></script>
 <script src="static/employee_steps.js"></script>

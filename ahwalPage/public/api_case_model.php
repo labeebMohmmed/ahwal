@@ -1,9 +1,10 @@
 <?php
-// api_case_model.php — return only ID by (altColName, altSubColName)
-// Adds Unicode-safe compare, fully-qualified table, and ?debug=1 support.
+// api_case_model.php — return ID by (altColName, altSubColName), soft-fail JSON
 
+declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
@@ -13,15 +14,21 @@ $altCol = isset($_GET['altCol']) ? (string)$_GET['altCol'] : '';
 $altSub = isset($_GET['altSub']) ? (string)$_GET['altSub'] : '';
 $debug  = isset($_GET['debug']) && $_GET['debug'] === '1';
 
+// If inputs missing: return manageable JSON (200) instead of 400
 if ($altCol === '' || $altSub === '') {
-  http_response_code(400);
-  echo json_encode(['id'=>0,'error'=>'altCol and altSub are required'], JSON_UNESCAPED_UNICODE);
+  echo json_encode([
+    'ok'     => false,
+    'id'     => 0,
+    'found'  => false,
+    'error'  => 'altCol and altSub are required',
+    'debug'  => $debug ? ['altCol' => $altCol, 'altSub' => $altSub] : null
+  ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
-$pdo = db(); // ensure db() sets PDO::SQLSRV_ATTR_ENCODING => PDO::SQLSRV_ENCODING_UTF8
+$pdo = db(); // ensure UTF-8 for SQLSRV
 
-// Light normalization (helps with accidental double spaces / Arabic comma)
+// Normalize (Arabic comma + whitespace)
 $norm = static function (string $s): string {
   $s = str_replace('،', ',', $s);
   $s = preg_replace('/\s+/u', ' ', $s);
@@ -30,10 +37,10 @@ $norm = static function (string $s): string {
 $altColN = $norm($altCol);
 $altSubN = $norm($altSub);
 
-// Fully-qualified table to avoid DB context mismatches
+// Fully-qualified table
 $table = '[AhwalDataBase].[dbo].[TableAddModel]';
 
-// Exact match; convert parameters to NVARCHAR to force Unicode comparison (N'')
+// Exact, Unicode-safe match
 $sql = "
   SELECT TOP 1 ID
   FROM $table
@@ -48,55 +55,38 @@ try {
   $id = (int)($st->fetchColumn() ?: 0);
 
   if ($id > 0) {
-    $out = ['id' => $id];
-    if ($debug) {
-      $out['debug'] = [
-        'altCol'  => $altCol,
-        'altSub'  => $altSub,
-        'altColN' => $altColN,
-        'altSubN' => $altSubN,
+    echo json_encode([
+      'ok'    => true,
+      'id'    => $id,
+      'found' => true,
+      'debug' => $debug ? [
+        'altCol'  => $altCol,  'altSub'  => $altSub,
+        'altColN' => $altColN, 'altSubN' => $altSubN,
         'matched' => 'exact'
-      ];
-    }
-    echo json_encode($out, JSON_UNESCAPED_UNICODE);
+      ] : null
+    ], JSON_UNESCAPED_UNICODE);
     exit;
   }
 
-  // Optional LIKE fallback (still Unicode)
-  $sql2 = "
-    SELECT TOP 1 ID
-    FROM $table
-    WHERE altColName    LIKE '%' + CONVERT(NVARCHAR(400), :altCol) + '%'
-      AND altSubColName LIKE '%' + CONVERT(NVARCHAR(400), :altSub) + '%'
-    ORDER BY ID DESC;
-  ";
-  $st2 = $pdo->prepare($sql2);
-  $st2->execute([':altCol' => $altColN, ':altSub' => $altSubN]);
-  $id2 = (int)($st2->fetchColumn() ?: 0);
-
-  if ($id2 > 0) {
-    $out = ['id' => $id2];
-    if ($debug) {
-      $out['debug'] = [
-        'altCol'  => $altCol,
-        'altSub'  => $altSub,
-        'altColN' => $altColN,
-        'altSubN' => $altSubN,
-        'matched' => 'like'
-      ];
-    }
-    echo json_encode($out, JSON_UNESCAPED_UNICODE);
-  } else {
-    http_response_code(404);
-    echo json_encode([
-      'id' => 0,
-      'error' => 'not found',
-      'debug' => $debug ? ['altCol'=>$altCol,'altSub'=>$altSub,'altColN'=>$altColN,'altSubN'=>$altSubN] : null
-    ], JSON_UNESCAPED_UNICODE);
-  }
+  // Not found → still 200 with a manageable body
+  echo json_encode([
+    'ok'    => true,
+    'id'    => 0,
+    'found' => false,
+    'debug' => $debug ? [
+      'altCol'  => $altCol,  'altSub'  => $altSub,
+      'altColN' => $altColN, 'altSubN' => $altSubN
+    ] : null
+  ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
   error_log('api_case_model.php: '.$e->getMessage());
+  // Server error → you can keep 500, but still return structured JSON
   http_response_code(500);
-  echo json_encode(['id'=>0,'error'=>'server error'], JSON_UNESCAPED_UNICODE);
+  echo json_encode([
+    'ok'    => false,
+    'id'    => 0,
+    'found' => false,
+    'error' => 'server error'
+  ], JSON_UNESCAPED_UNICODE);
 }

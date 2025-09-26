@@ -1,0 +1,160 @@
+/* =========================
+   Dashboard-specific Styles
+   ========================= */
+body {
+  font-family: system-ui, "Noto Naskh Arabic", sans-serif;
+  margin: 0;
+  background: #f9fafb;
+  display: flex;
+  min-height: 100vh;
+  direction: rtl;
+  color: #111827; /* unify all text to black */
+}
+
+/* Auth layout */
+.auth-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 960px;
+  margin: 8vh auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  background: #fff;
+  overflow: hidden;
+}
+
+.auth-left {
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.auth-left img {
+  max-width: 80%;
+  margin-bottom: 1rem;
+}
+.auth-left h1 {
+  color: #111827; /* black text */
+  font-size: 1.8rem;
+}
+.auth-left p {
+  color: #374151; /* muted gray */
+}
+
+/* Right panel */
+.auth-right {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: 1.5rem;
+}
+.tab-btn {
+  flex: 1;
+  padding: .6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: bold;
+  color: #111827;
+  transition: all .2s;
+}
+.tab-btn.active {
+  background: #16a34a; /* green accent */
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Forms */
+form label {
+  display: block;
+  margin-top: 1rem;
+  color: #111827;
+}
+form input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-top: 0.25rem;
+  color: #111827;
+}
+form button {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.8rem;
+  background: #16a34a; /* green */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background .2s;
+}
+form button:hover {
+  background: #15803d; /* darker green */
+}
+
+/* Messages */
+.message {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #111827;
+}
+.message.error {
+  border-right: 3px solid #dc2626; /* red */
+  padding-right: .5rem;
+}
+.message.success {
+  border-right: 3px solid #16a34a; /* green */
+  padding-right: .5rem;
+}
+
+/* Dashboard table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  direction: rtl;
+}
+
+.table th,
+.table td {
+  border: 1px solid #ccc;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  color: #111827;
+}
+
+.table th {
+  background: #f1f1f1;
+  font-weight: bold;
+}
+
+.table tr:nth-child(even) {
+  background: #fafafa;
+}

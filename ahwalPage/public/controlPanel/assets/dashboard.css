@@ -1,0 +1,358 @@
+/* =========================
+   Dashboard-specific Styles
+   ========================= */
+
+/* Header & nav */
+header {
+  background: var(--accent);
+  color: #fff;
+  padding: var(--pad);
+  box-shadow: var(--shadow);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+nav {
+  margin-top: .5rem;
+}
+
+nav a {
+  color: #fff;
+  margin-inline-start: 1rem;
+  text-decoration: none;
+  font-weight: 700;
+  transition: opacity .2s, background .2s;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+nav a:hover {
+  opacity: .85;
+  text-decoration: underline;
+}
+
+nav a.active-link {
+  background: #fff;
+  /* white background */
+  color: var(--accent);
+  /* blue text */
+  text-decoration: none;
+  /* no underline */
+}
+
+
+/* Dashboard cards */
+#dashboard-main .card {
+  width: 100%;
+  max-width: 1200px;
+  /* adjust as you like */
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.card h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+
+}
+
+.table th,
+.table td {
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  /* RTL friendly */
+}
+
+.table th {
+  background: var(--accent);
+  color: #fff;
+}
+
+
+/* File upload fieldset */
+.file-upload {
+  margin-top: 1.5rem;
+}
+
+.file-upload input[type="file"] {
+  display: block;
+  margin-top: .5rem;
+  padding: .4rem;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: var(--radius-sm, 6px);
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.file-status {
+  margin-top: .5rem;
+  font-size: .9rem;
+}
+
+.file-status.muted {
+  color: #6b7280;
+  /* gray */
+}
+
+/* Submit actions */
+.actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+button.primary {
+  padding: .7rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius, 8px);
+  border: none;
+  background: var(--accent, #16a34a);
+  /* green if your style.css uses it */
+  color: #fff;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+button.primary:hover {
+  background: #15803d;
+  /* darker green */
+}
+
+/* Hide the native file input */
+.file-upload input[type="file"] {
+  display: none;
+}
+
+/* Custom button */
+.upload-btn {
+  display: inline-block;
+  padding: .6rem 1.2rem;
+  background: var(--accent, #16a34a);
+  color: #fff;
+  border-radius: var(--radius, 8px);
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  margin-top: .5rem;
+}
+
+.upload-btn:hover {
+  background: #15803d;
+}
+
+.file-name {
+  margin-right: 1rem;
+  font-size: .9rem;
+  color: #374151;
+}
+
+.file-status {
+  margin-top: .5rem;
+  font-size: .85rem;
+}
+
+.file-status.muted {
+  color: #6b7280;
+}
+
+#mandoub-insert-panel .panel-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 5;
+}
+
+#mandoub-insert-panel .panel-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  width: 400px;
+  z-index: 10;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  /* space between fields */
+  flex-wrap: wrap;
+  /* wrap on small screens */
+  margin-bottom: 10px;
+}
+
+.filter-bar input {
+  flex: 1;
+  /* each input grows equally */
+  min-width: 160px;
+  /* don’t shrink too small */
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.doc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.doc-card {
+  max-width: 240px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+.doc-preview {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.doc-title {
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+  min-height: 2rem;
+}
+
+.doc-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+
+/* === Reports Page Styling === */
+.reports {
+  padding: 1rem;
+  direction: rtl; /* keep Arabic natural */
+  font-family: "Noto Naskh Arabic", system-ui, sans-serif;
+}
+
+/* Filters */
+.reports .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.reports .filters select,
+.reports .filters input[type="date"] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+.reports .filters button {
+  background: var(--accent, #2563eb);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.reports .filters button:hover {
+  background: #1d4ed8;
+}
+
+/* KPI Cards */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.kpi {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.kpi span {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+/* Charts */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.charts canvas {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Table */
+#reportTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+#reportTable thead {
+  background: #f3f4f6;
+}
+#reportTable th, #reportTable td {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+}
+#reportTable th {
+  font-weight: bold;
+  color: #fff;
+  text-align: right; /* RTL */
+}
+#reportTable tr:hover {
+  background: #f9fafb;
+}

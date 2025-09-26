@@ -4,6 +4,49 @@
    - Morphology via Tablechar only (canonicalize → realize)
    - Does NOT call api_lexicon.php
 */
+
+let signer = "";
+let signer_role = "";
+let doc_id = "";
+// 🔹 Mapping for identity options
+const docTypeMap = {
+    "جواز سفر": { ar: "جواز سفر", en: "Passport" },
+    "رقم وطني": { ar: "رقم وطني", en: "National Number" },
+    "إقامة": { ar: "إقامة", en: "Residence Permit" }
+};
+
+fetch('../api_list_combo.php')
+    .then(res => res.json())
+    .then(j => {
+        if (j.ok) {
+            window.comboData = j;
+
+            // flatten extra lists
+            const mandoubs = [];
+            const arabCountries = [];
+            const foreignCountries = [];
+
+            (j.comboRows || []).forEach(r => {
+                if (r.MandoubNames) mandoubs.push(r.MandoubNames);
+                if (r.ArabCountries) arabCountries.push(r.ArabCountries);
+                if (r.ForiegnCountries) foreignCountries.push(r.ForiegnCountries);
+            });
+
+            window.comboData.mandoubs = mandoubs;
+            window.comboData.arabCountries = arabCountries;
+            window.comboData.foreignCountries = foreignCountries;
+
+            // diplomats + settings already in payload
+            window.comboData.diplomats = j.diplomats || [];
+            window.comboData.settings = j.settings || [];
+
+            console.log("✅ Combo data loaded", window.comboData.settings);
+        } else {
+            console.error("❌ Failed to load combo data", j.error);
+        }
+    })
+    .catch(err => console.error("API error:", err));
+
 // Map DB party → objects our builders understand
 function normalizeCaseParty(party) {
     const asPeople = (arr) => (Array.isArray(arr) ? arr : []).map(p => {
@@ -16,6 +59,7 @@ function normalizeCaseParty(party) {
             passportType: id.type || 'جواز سفر',
             documentType: id.type || 'جواز سفر',
             passportNo: id.number || '',
+            expiry: id.expiry || '',
             issuePlace: id.issuer || id.issuePlace || '',
             residesInKSA: (p.residenceStatus || '').includes('مقيم'),
             title: (p.gender === 'f' || p.sex === 'F') ? 'السيدة/' : 'السيد/'
@@ -142,9 +186,15 @@ function finalCorrections(text, rows, ctxAll) {
 
     // Collapse repeated "في" like "في، في", "في  في", "في،  في، في" -> "في"
     s = s.replace(/(^|[^\p{L}])في(?:\s*[،,]?\s*في)+(?![\p{L}])/gu, '$1في');
+    s = s.replace('اقرار', 'إقرار');
+    s = s.replace(/أقر\s*[،,]\s*أقر/g, 'أقر');
 
 
     // 1) Normalize root markers, then canonicalize → realize(2) → realize(1)
+    s = tightenRootMarkers(s, rows);
+
+    s = tightenRootMarkers(s, rows);
+
     s = tightenRootMarkers(s, rows);
 
     // 2) Generic duplicate sequence removal (handles "في في", "عني ويقوم مقامي عني ويقوم مقامي", etc.)
@@ -219,14 +269,23 @@ function normalizeCaseDetails(details) {
     };
 }
 
-async function openOfficeCase1(officeId, go_to_one = true) {
+async function openOfficeCase1(officeId, MainGroup, go_to_one = true) {
     if (!officeId) return;
-    const res = await fetch('api_office_case_detail.php?id=' + encodeURIComponent(officeId));
+    const qs = new URLSearchParams({
+        id: String(officeId),
+        mainGroup: MainGroup || 'توكيل',
+    });
+    // console.log(mainGroup);
+    const res = await fetch(`api_office_case_detail.php?${qs.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+    });
+
     if (!res.ok) { alert('تعذر فتح بيانات المكتب'); return; }
     const data = await res.json();
-
     // You can reuse the exact same body from openCase(data.case.caseId) after the fetch:
     appState = {
+        doc_id: data.case?.doc_id ?? null,
         caseId: data.case?.caseId,
         userId: data.case?.userId ?? 0,
         lang: (data.details?.model?.langLabel === 'الانجليزية') ? 'en' : 'ar',
@@ -270,7 +329,7 @@ async function openOfficeCase1(officeId, go_to_one = true) {
                 ? [{ type: w.ids[0]?.type ?? 'جواز سفر', number: w.ids[0]?.number ?? '' }]
                 : []
         })),
-
+        basic_info: {},
         answers: data.details?.answers || {},
         flags: {
             needAuthenticated: !!data.details?.requirements?.needAuthenticated,
@@ -301,15 +360,14 @@ async function loadCaseContextFromServer(caseId) {
     let meta = [];
     let docLang = 'ar';
     if (localStorage.getItem('role') === 'employee') {
-        
-        openOfficeCase1(caseId, false);
+        const mainGroup = localStorage.getItem('selectedMainGroup');
+        openOfficeCase1(caseId, mainGroup, false);
         data.party = {
             applicants: window.universalappState.applicants,
             authenticated: window.universalappState.authenticated,
             witnesses: window.universalappState.witnesses,
             contact: { phone: '', email: '' }
         }
-        
 
         data.details = {
             mainGroup: window.universalappState.selected.mainGroup || '',
@@ -319,20 +377,22 @@ async function loadCaseContextFromServer(caseId) {
         }
         docLang = window.universalappState.lang;
         data.ok = true;
-        
+
+
+
     } else {
         const res = await fetch(apiResolve(`api_case_get.php?caseId=${encodeURIComponent(caseId)}`), { credentials: 'same-origin' });
         if (!res.ok) return null;
         data = await res.json().catch(() => null);
         docLang = (data.lang || '').toLowerCase() === 'en' ? 'en' : 'ar';
     }
-    
+
     if (!data?.ok) return null;
 
     party = normalizeCaseParty(data.party || {});
     meta = normalizeCaseDetails(data.details || {});
-    // console.log(party,data.details);
-    window.currentCaseParty = party;        
+
+    window.currentCaseParty = party;
     window.currentCaseMeta = data.details;
     // Make available to the builder    
 
@@ -377,6 +437,9 @@ function apiResolve(path) {
 
     const empTextPanel = $('#employeeTextPanel', secEmp || document);
     const empText = $('#empText', secEmp || document);
+
+    const authenticater_text = $('#authenticater_text', secEmp || document);
+
     const autoSync = $('#autoSyncEmpText', secEmp || document);
     const btnBuild = $('#btnRebuildEmpText', secEmp || document);
     const btnLoadTM = $('#btnLoadTextModel', secEmp || document);
@@ -474,6 +537,8 @@ function apiResolve(path) {
         const onNext = () => {
             if (currentRole === 'employee' && empText) {
                 sessionStorage.setItem('emp_final_text', empText.value);
+                sessionStorage.setItem('emp_authenticater_text', authenticater_text.value);
+
             }
         };
         nextBase?.addEventListener('click', onNext);
@@ -597,7 +662,7 @@ function apiResolve(path) {
     }
 
     // --- helper: compose the 3-line Wakala intro, neutral line-3 gets morphed alone ---
-    function buildWakalaIntroBlock({ applicants, authenticated, chars, altColName, altSubColName, mainGroup, lang, legalStatus }) {
+    function buildIntroBlock({ applicants, authenticated, chars, altColName, altSubColName, mainGroup, lang, legalStatus }) {
         const rows = normalizeTablecharRows(chars);
 
         // 1) Applicants line (uses legalStatus)
@@ -605,7 +670,7 @@ function apiResolve(path) {
         let line2 = '';
         let line3 = '';
         if (!isWakala(mainGroup)) {
-            console.log('line1', line1);
+
             return line1;
         }
 
@@ -626,6 +691,67 @@ function apiResolve(path) {
         return out;
     }
 
+    function create_authenticater_text(mainGroup, signer, lang, is_witnessed) {
+        let text = '';
+
+        if (mainGroup === 'توكيل')
+            text = `أشهد أنا/ ${signer} بأن المواطن المذكور أعلاه قد حضر ووقع بتوقيعه على هذا التوكيل في حضور الشاهدين المشار إليهما أعلاه وذلك بعد تلاوته عليه وبعد أن فهم مضمونه ومحتواه، صدر تحت توقيعي وختم القنصلية العامة.`
+
+        else if (mainGroup === 'إقرار' || mainGroup === 'إقرار مشفوع باليمين') {
+            if (lang === 'الانجليزية')
+                text = 'Signed and sworn before me.'
+            else {
+                if (is_witnessed)
+                    text = `أشهد أنا/ ${signer} بأن المواطن المذكور أعلاه قد حضر ووقع بتوقيعه على هذا الإقرار في حضور الشاهدين المشار إليهما أعلاه وذلك بعد تلاوته عليه وبعد أن فهم مضمونه ومحتواه، صدر تحت توقيعي وختم القنصلية العامة.`
+                else
+                    text = `أشهد أنا/ {session['Attenddiplomat'] } بأن المواطن المذكور أعلاه قد حضر ووقع بتوقيعه على هذا الإقرار وذلك بعد تلاوته عليه وبعد أن فهم مضمونه ومحتواه، صدر تحت توقيعي وختم القنصلية العامة.`
+            }
+        }
+        else if (mainGroup === 'إفادة لمن يهمه الأمر') {
+            if (lang === 'الانجليزية')
+                text = 'This certificate has been issued upon his request,,,'
+            else
+                text = "حررت هذه الإفادة بناء على طلب المواطن المذكور أعلاه لاستخدامها على الوجه المشروع"
+        }
+        return text;
+    }
+
+
+    function prepareTemplateVars(person) {
+        const lang = localStorage.getItem('docLang') || 'ar';
+        const rawType = person.passportType || person.documentType || "";
+        return {
+            "tN": person.fullName || "",
+            "tP": person.passportNo || "",       // 🔥 was missing
+            "tX": person.title || person.fullName || "",
+            "tD": docTypeMap[rawType]?.[lang] || rawType,
+            "tB": person.dob || "",              // add if your object has DoB
+            "tS": person.issuePlace || "",
+            "fD": person.expiry || ""            // if expiry available
+        };
+    }
+
+
+    /**
+     * Replace tokens inside model string with person data
+     */
+    function realizeModel(model, personOrList) {
+        // If we got an array, take the first person (or merge later if needed)
+        const person = Array.isArray(personOrList) ? personOrList[0] : personOrList;
+        if (!person) return model;
+
+        const vars = prepareTemplateVars(person);
+
+        for (const [token, value] of Object.entries(vars)) {
+            if (value && model.indexOf(token) !== -1) {
+                model = model.replace(new RegExp(token, 'g'), value);
+            }
+        }
+        return model;
+    }
+
+
+
 
     // --- drop-in replacement ---
     async function safeRebuildEmployeeText() {
@@ -639,9 +765,10 @@ function apiResolve(path) {
             // Ensure case context ready
             const caseId = Number(localStorage.getItem('caseId') || 0);
 
-            if (caseId > 0 && (!window.currentCaseParty || !window.currentCaseMeta)) {
+            if (caseId > 0) {
 
                 await loadCaseContextFromServer(caseId);
+                // console.log(window.currentCaseParty);
             }
 
             // Parties + meta
@@ -658,7 +785,33 @@ function apiResolve(path) {
             const altColName = meta.altColName || '';
             const altSubColName = meta.altSubColName || '';
             const lang = (localStorage.getItem('docLang') === 'en') ? 'الانجليزية' : 'العربية';
-           
+            const isEnglish = (lang === 'الانجليزية');
+            const textAlign = isEnglish ? 'left' : 'right';
+            const dir = isEnglish ? 'ltr' : 'rtl';
+            if (isEnglish) {
+                signer = get(LS.en_diplomat);
+                signer_role = get(LS.en_diplomat_job);
+            }
+            else {
+                signer = get(LS.ar_diplomat);
+                signer_role = get(LS.ar_diplomat_job);
+            }
+            [empText, authenticater_text].forEach(el => {
+                el.style.textAlign = textAlign;
+                el.setAttribute('dir', dir);
+
+                // force LTR/RTL override explicitly
+                if (isEnglish) {
+                    el.style.unicodeBidi = "plaintext"; // force logical order
+                } else {
+                    el.style.unicodeBidi = "plaintext";
+                }
+            });
+
+
+
+            // console.log(window.currentCaseParty);
+
             // Tablechar rows
             const rows = await ensureTablechar({ force: false });
 
@@ -674,16 +827,32 @@ function apiResolve(path) {
             // Morphology for the model block
             const appSlot = deriveMorphSlot(applicants);
             const authSlot = deriveMorphSlot(authenticated);
-            let modelBlock = morphTextWithTablechar(rows, modelBlockRaw, 0, '*');               // canonicalize
-            modelBlock = realizeTextForPerson(rows, modelBlock, authSlot, '2', { debug: false });
+
+            const is_witnessed = window.universalappState.flags.needWitnesses || false;
+            let auth_text = create_authenticater_text(mainGroup, signer, lang, is_witnessed);
+            auth_text = realizeTextForPerson(rows, auth_text, appSlot, '3', { debug: false });
+            const t1 = document.getElementById('fld_itext1');
+            if (mainGroup !== 'مخاطبة لتاشيرة دخول') {
+                authenticater_text.value = auth_text;
+            }
+            else if (t1) {
+                if (lang === 'العربية')
+                    authenticater_text.value = "تنتهز القنصلية العامة لجمهورية السودان بجدة هذه السانحة لتُعرب للقنصلية العامة لt1 بجدة عن فائق شكرها وتقديرها واحترامها.".replace('t1', t1.value);
+                else
+                    authenticater_text.value = 'The Consulate General of the Republic of Sudan in Jeddah avails itself this opportunity to renew to the esteemed Consulate General of t1 in Jeddah the assurances of its highest consideration.'.replace('t1', t1.value);
+
+            }
+
+            let modelBlock = realizeTextForPerson(rows, modelBlockRaw, authSlot, '2', { debug: false });
+            if (!isWakala(mainGroup))
+                modelBlock = modelBlockRaw;
             modelBlock = realizeTextForPerson(rows, modelBlock, appSlot, '1', { debug: false });
             modelBlock = modelBlock.trim();
 
             // ==== 2) Build the intro block (Wakala intro) ====
-            const introBlock = buildWakalaIntroBlock({
+            const introBlock = buildIntroBlock({
                 applicants,
                 authenticated,
-
                 chars: rows,
                 altColName,
                 altSubColName,
@@ -691,21 +860,32 @@ function apiResolve(path) {
                 lang,
                 legalStatus: legalStatus || ''
             }).trim();
-            
+
             // ==== 3) Decide if we need to append the model block (avoid duplicates) ====
             const normalizeLite = (s) =>
                 String(s || '')
                     .replace(/\s+/g, ' ')     // collapse whitespace
                     .replace(/[،,]+/g, '،')   // unify comma
+                    .replace('ماماما', 'ما')
+                    .replace('أقر، أقر', 'أقر')
+                    .replace('اقرار ', 'إقرار ')
                     .trim();
 
             let combined = introBlock;
             const introNorm = normalizeLite(introBlock);
-            const modelNorm = normalizeLite(modelBlock);
+            let modelNorm = normalizeLite(modelBlock);
 
-            if (modelNorm && !introNorm.includes(modelNorm)) {
+            // modelNorm = realizeTextForPerson(rows, modelNorm, appSlot, '1', { debug: false });
+            // console.log(applicants);
+            if (!isWakala(mainGroup))
+                modelNorm = realizeModel(modelNorm, applicants);
+
+            if (modelNorm && !introNorm.includes(modelNorm) && isWakala(mainGroup)) {
                 // Only append if the intro doesn't already contain the model content
                 combined = `${combined}،\n\n${modelBlock}`;
+            }
+            else {
+                combined = `${combined}،\n\n${modelNorm}`;
             }
 
             // ==== 4) Build rights block (token replacement + morph) ====
@@ -717,14 +897,15 @@ function apiResolve(path) {
                 rightsBlock = r.trim();
             }
 
-            if (rightsBlock) combined = `${combined}،\n\n${rightsBlock}`;
+            if (rightsBlock)
+                combined = `${combined}،\n\n${rightsBlock}`;
 
             // ==== 5) Final pass: overall corrections ====
             const ctxAll = computeCtxFromParties(applicants, authenticated);
             const finalText = finalCorrections(combined, rows, ctxAll);
 
             if (empText) empText.value = finalText;
-
+            checkMixedLanguages();
             // Debug summary
             console.debug('[Step5] Built:', {
                 hasIntro: !!introBlock,
@@ -862,7 +1043,7 @@ function apiResolve(path) {
         const tplId =
             getLS('selectedTemplateId') || getLS('tpl') ||
             sessionStorage.getItem('selectedTemplateId') || sessionStorage.getItem('tpl') || '';
-        
+
         const lang = getLS('docLang') || 'ar';
         if (!tplId) {
             textModel = ''; rightsText = ''; legalStatusText = '';
@@ -1231,10 +1412,11 @@ function realizeTextForPerson(rows, text, targetIndex, person, opts = {}) {
         if (!row143) console.debug('[Realize] NOTE: row 143 (وبطوعي$$$) not in candidates — check pronounType/Ext for "1".');
     }
 
+
     const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Arabic-aware tokenizer: (^|non-letter)(optional 'و')(letters [+ optional marker])(optional punct)
-    const tokenRE = /(^|[^\p{L}])(و?)([\p{L}]+(?:[^\p{L}]+)?)([،,/]?)(?=$|[^\p{L}])/gu;
+    const tokenRE = /(^|[^\p{L}])(و?)([^\s،,\/]+)([،,/]?)(?=$|[^\p{L}])/gu;
 
     let tokenNo = 0, hits = 0;
 
@@ -1280,6 +1462,7 @@ function realizeTextForPerson(rows, text, targetIndex, person, opts = {}) {
             }
 
             // --- Then try BARE (so lexemes without 'و' still match) ---
+            // console.log(bare);
             if (bare === r.root) {
                 hits++;
                 if (debug && wantLog) console.debug(`[Realize#${tokenNo}] ROOT@BARE "${bare}" -> row#${r.id} -> "${target}"`);
@@ -1491,20 +1674,31 @@ function buildApplicantsIntro(altSubColName, appName, chars, authPart, mainGroup
         const app = appName[0];
         const sex = gx(app, 3, 'gender')
         const name = gx(app, 2, 'fullName') || '—';
-        const doc = gx(app, 5, 'documentType') || gx(app, 5, 'passportType') || 'جواز سفر';
+        let doc = gx(app, 5, 'documentType') || gx(app, 5, 'passportType') || 'جواز سفر';
         const pass = normalizePassportNo(gx(app, 6, 'passportNo'));
         const issue = gx(app, 7, 'issuePlace') || '';
         const resides = Boolean(gx(app, 9, 'residesInKSA'));
         if (resides) residState = '، المقيم بالمملكة العربية السعودية ';
 
-        if (lang === 'الانجليزية') {
-            text = `I, ${name} holder of Sudanese ${doc} no. ${pass} issued in ${issue}, ${legalStatus || 'legal status'}, `;
-        } else {
-            const ls = legalStatus ? `${legalStatus}، ` : '';
-            if (sex === 'm')
-                text = `أنا المواطن / ${name}${residState}حامل ${doc} بالرقم ${pass} إصدار ${issue}، ${ls}${textRequest}`;
-            else
-                text = `أنا المواطنة / ${name}${residState}حاملة ${doc} بالرقم ${pass} إصدار ${issue}، ${ls}${textRequest}`;
+        if (mainGroup === 'توكيل' || mainGroup === 'إقرار' || mainGroup === 'إقرار مشفوع باليمين') {
+            if (lang === 'الانجليزية') {
+
+                doc = docTypeMap[doc]?.['en'] || doc
+                legalStatus = "In full possession of my mental faculties, acting freely and voluntarily, and in a legally and Sharia-recognized condition";
+                text = `I, ${name} holder of Sudanese ${doc} no. ${pass} issued in ${issue}, ${legalStatus || 'legal status'}, `;
+            } else {
+                const ls = legalStatus ? `${legalStatus}، ` : '';
+                if (sex === 'm')
+                    text = `أنا المواطن / ${name}${residState}حامل ${doc} بالرقم ${pass} إصدار ${issue}، ${ls}${textRequest}`;
+                else
+                    text = `أنا المواطنة / ${name}${residState}حاملة ${doc} بالرقم ${pass} إصدار ${issue}، ${ls}${textRequest}`;
+            }
+        } else if (mainGroup === 'إفادة لمن يهمه الأمر') {
+            if (lang === 'العربية') {
+                text = 'تفيد القنصلية العامة لجمهورية السودان بجدة بأن ';
+            } else {
+                text = '';
+            }
         }
     } else {
         const ls = legalStatus ? `${legalStatus}، ` : '';
@@ -1513,7 +1707,7 @@ function buildApplicantsIntro(altSubColName, appName, chars, authPart, mainGroup
 
 
     let result = realizeTextForPerson(rows, text, slot, '1', { debug: true })
-    
+
 
     if (authPart && typeof authPart === 'string' && authPart.trim()) {
         result = `${result} ${authPart}`.trim();
@@ -1577,3 +1771,692 @@ function authNamePart1(authName, appName, chars, altColName, mainGroup, lang = '
     }
     return '';
 }
+
+
+// === PURE JS QR generator with logo overlay ===
+// Exposes: window.qrPngDataURL, window.qrPngDataURLWithLogo
+(function () {
+    const ECC_MAP = { L: 1, M: 0, Q: 3, H: 2 };
+
+    // ---------------- 8-bit data ----------------
+    function QR8(data) { this.bytes = Array.from(new TextEncoder().encode(String(data))); }
+    QR8.prototype = {
+        len() { return this.bytes.length; },
+        write(buf) { for (const b of this.bytes) buf.put(b, 8); }
+    };
+
+    // ---------------- GF(256) math --------------
+    const QRMath = (() => {
+        const EXP = new Array(256), LOG = new Array(256);
+        for (let i = 0; i < 8; i++) EXP[i] = 1 << i;
+        for (let i = 8; i < 256; i++) EXP[i] = EXP[i - 4] ^ EXP[i - 5] ^ EXP[i - 6] ^ EXP[i - 8];
+        for (let i = 0; i < 255; i++) LOG[EXP[i]] = i;
+        return { mul: (x, y) => (x === 0 || y === 0) ? 0 : EXP[(LOG[x] + LOG[y]) % 255], LOG, EXP };
+    })();
+
+    // --------------- Polynomials ----------------
+    function Poly(num, shift) {
+        let off = 0; while (off < num.length && num[off] === 0) off++;
+        this.num = num.slice(off).concat(Array(shift).fill(0));
+    }
+    Poly.prototype = {
+        len() { return this.num.length; },
+        get(i) { return this.num[i]; },
+        mult(e) {
+            const n = new Array(this.len() + e.len() - 1).fill(0);
+            for (let i = 0; i < this.len(); i++) for (let j = 0; j < e.len(); j++)
+                n[i + j] ^= QRMath.mul(this.get(i), e.get(j));
+            return new Poly(n, 0);
+        },
+        mod(e) {
+            if (this.len() - e.len() < 0) return this;
+            const ratio = QRMath.LOG[this.get(0)] - QRMath.LOG[e.get(0)];
+            const n = this.num.slice();
+            for (let i = 0; i < e.len(); i++)
+                n[i] ^= (e.get(i) === 0) ? 0 : QRMath.EXP[(QRMath.LOG[e.get(i)] + ratio) % 255];
+            return new Poly(n, 0).mod(e);
+        }
+    };
+
+    // --------------- Utilities ------------------
+    const Util = (() => {
+        const POS = [[], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50], [6, 30, 54]];
+        const ECW = {
+            1: { L: 7, M: 10, Q: 13, H: 17 }, 2: { L: 10, M: 16, Q: 22, H: 28 }, 3: { L: 15, M: 26, Q: 36, H: 44 }, 4: { L: 20, M: 36, Q: 52, H: 64 },
+            5: { L: 26, M: 48, Q: 72, H: 88 }, 6: { L: 36, M: 64, Q: 96, H: 112 }, 7: { L: 40, M: 72, Q: 108, H: 130 }, 8: { L: 48, M: 88, Q: 132, H: 156 },
+            9: { L: 60, M: 110, Q: 160, H: 192 }, 10: { L: 72, M: 130, Q: 192, H: 224 }
+        };
+        function BCHTypeInfo(d) { let v = d << 10, g = 0b10100110111; for (; lg(v) - lg(g) >= 0;) v ^= g << (lg(v) - lg(g)); return ((d << 10) | v) ^ 0b101010000010010; }
+        function BCHTypeNum(d) { let v = d << 12, g = 0b1111100100101; for (; lg(v) - lg(g) >= 0;) v ^= g << (lg(v) - lg(g)); return (d << 12) | v; }
+        function lg(n) { let L = -1; for (; n; n >>= 1) L++; return L; }
+        function pos(ver) { return POS[ver - 1] || []; }
+        function mask(m, i, j) {
+            switch (m) {
+                case 0: return (i + j) % 2 === 0;
+                case 1: return i % 2 === 0;
+                case 2: return j % 3 === 0;
+                case 3: return (i + j) % 3 === 0;
+                case 4: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0;
+                case 5: return (i * j) % 2 + (i * j) % 3 === 0;
+                case 6: return ((i * j) % 2 + (i * j) % 3) % 2 === 0;
+                default: return ((i * j) % 3 + (i + j) % 2) % 2 === 0;
+            }
+        }
+        function ecPoly(len) { let a = new Poly([1], 0); for (let i = 0; i < len; i++) a = a.mult(new Poly([1, QRMath.EXP[i]], 0)); return a; }
+        return { pos, ECW, BCHTypeInfo, BCHTypeNum, mask, ecPoly };
+    })();
+
+    // --------------- RS blocks (v1..10) ---------
+    const RS = {
+        1: { L: [[1, 19]], M: [[1, 16]], Q: [[1, 13]], H: [[1, 9]] },
+        2: { L: [[1, 34]], M: [[1, 28]], Q: [[1, 22]], H: [[1, 16]] },
+        3: { L: [[1, 55]], M: [[1, 44]], Q: [[2, 17]], H: [[2, 13]] },
+        4: { L: [[1, 80]], M: [[2, 32]], Q: [[2, 24]], H: [[4, 9]] },
+        5: { L: [[1, 108]], M: [[2, 43]], Q: [[2, 15], [2, 16]], H: [[2, 11], [2, 12]] },
+        6: { L: [[2, 68]], M: [[4, 27]], Q: [[4, 19]], H: [[4, 15]] },
+        7: { L: [[2, 78]], M: [[4, 31]], Q: [[2, 14], [4, 15]], H: [[4, 13], [1, 14]] },
+        8: { L: [[2, 97]], M: [[2, 38], [2, 39]], Q: [[4, 18], [2, 19]], H: [[4, 14], [2, 15]] },
+        9: { L: [[2, 116]], M: [[3, 36], [2, 37]], Q: [[4, 16], [4, 17]], H: [[4, 12], [4, 13]] },
+        10: { L: [[2, 68], [2, 69]], M: [[4, 43], [1, 44]], Q: [[6, 19], [2, 20]], H: [[6, 15], [2, 16]] }
+    };
+    function getRSBlocks(ver, ecc) {
+        const groups = RS[ver][ecc]; const ec = Util.ECW[ver][ecc]; const out = [];
+        for (const [count, dc] of groups) for (let i = 0; i < count; i++) out.push({ dataCount: dc, totalCount: dc + ec });
+        return out;
+    }
+
+    // --------------- Bit buffer -----------------
+    function BitBuf() { this.buf = []; this.len = 0; }
+    BitBuf.prototype = {
+        put(n, l) { for (let i = 0; i < l; i++) this.putBit(((n >>> (l - i - 1)) & 1) === 1); },
+        putBit(b) { const idx = Math.floor(this.len / 8); if (this.buf.length <= idx) this.buf.push(0); if (b) this.buf[idx] |= (0x80 >>> (this.len % 8)); this.len++; }
+    };
+
+    // --------------- QR model -------------------
+    function QR(ver, eccName) {
+        this.version = ver || 0;
+        this.eccName = eccName || 'M';
+        this.ecc = ECC_MAP[this.eccName] ?? 0;
+        this.modules = null; this.size = 0; this.dataList = [];
+    }
+    QR.prototype = {
+        addData(t) { this.dataList.push(new QR8(t)); },
+        make() {
+            if (this.version < 1) {
+                for (let v = 1; v <= 10; v++) {
+                    const cap = getRSBlocks(v, this.eccName).reduce((a, b) => a + b.dataCount, 0);
+                    const need = this._neededBits(v);
+                    if (need <= cap * 8) { this.version = v; break; }
+                }
+                if (this.version < 1) this.version = 10;
+            }
+            this.size = this.version * 4 + 17;
+            this.modules = Array.from({ length: this.size }, () => Array(this.size).fill(null));
+            this._placePatterns();
+            const mask = this._chooseMaskAndFill();
+            this._placeTypeInfo(mask);
+            if (this.version >= 7) this._placeTypeNumber();
+        },
+        _neededBits(v) {
+            const bb = new BitBuf();
+            for (const d of this.dataList) {
+                bb.put(4, 4);
+                bb.put(d.len(), v < 10 ? 8 : 16);
+                d.write(bb);
+            }
+            const rs = getRSBlocks(v, this.eccName);
+            const total = rs.reduce((a, b) => a + b.dataCount, 0) * 8;
+            return Math.min(bb.len, total) + 4;
+        },
+        _placePatterns() {
+            const n = this.size;
+            const pp = (r, c) => {
+                for (let i = -1; i <= 7; i++) {
+                    if (r + i < 0 || r + i >= n) continue;
+                    for (let j = -1; j <= 7; j++) {
+                        if (c + j < 0 || c + j >= n) continue;
+                        const on = ((i >= 0 && i <= 6 && (j === 0 || j === 6)) || (j >= 0 && j <= 6 && (i === 0 || i === 6)) || (i >= 2 && i <= 4 && j >= 2 && j <= 4));
+                        this.modules[r + i][c + j] = on ? true : false;
+                    }
+                }
+            };
+            pp(0, 0); pp(n - 7, 0); pp(0, n - 7);
+            for (let i = 8; i < n - 8; i++) {
+                if (this.modules[i][6] === null) this.modules[i][6] = (i % 2 === 0);
+                if (this.modules[6][i] === null) this.modules[6][i] = (i % 2 === 0);
+            }
+            const pos = Util.pos(this.version);
+            for (let i = 0; i < pos.length; i++) for (let j = 0; j < pos.length; j++) {
+                const r = pos[i], c = pos[j]; if (this.modules[r][c] !== null) continue;
+                for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+                    this.modules[r + y][c + x] = (Math.max(Math.abs(x), Math.abs(y)) !== 1);
+                }
+            }
+        },
+        _placeTypeInfo(mask) {
+            const v = this.size;
+            const data = (({ L: 1, M: 0, Q: 3, H: 2 })[this.eccName] << 3) | mask;
+            const bits = Util.BCHTypeInfo(data);
+            for (let i = 0; i < 15; i++) {
+                const m = !((bits >> i) & 1);
+                if (i < 6) this.modules[i][8] = m; else if (i < 8) this.modules[i + 1][8] = m; else this.modules[v - 15 + i][8] = m;
+                if (i < 8) this.modules[8][v - 1 - i] = m; else if (i < 9) this.modules[8][15 - i] = m; else this.modules[8][14 - i] = m;
+            }
+            this.modules[v - 8][8] = true;
+        },
+        _placeTypeNumber() {
+            const v = this.version, bits = Util.BCHTypeNum(v);
+            for (let i = 0; i < 18; i++) {
+                const m = !((bits >> i) & 1);
+                this.modules[Math.floor(i / 3)][i % 3 + v * 4 + 9 - 8] = m;
+                this.modules[i % 3 + v * 4 + 9 - 8][Math.floor(i / 3)] = m;
+            }
+        },
+        _dataBytes() {
+            const rs = getRSBlocks(this.version, this.eccName);
+            const bb = new BitBuf();
+            for (const d of this.dataList) {
+                bb.put(4, 4);
+                bb.put(d.len(), this.version < 10 ? 8 : 16);
+                d.write(bb);
+            }
+            const totalDataCount = rs.reduce((a, b) => a + b.dataCount, 0);
+            const totalBits = totalDataCount * 8;
+            bb.put(0, Math.min(4, Math.max(0, totalBits - bb.len)));
+            while (bb.len % 8) bb.putBit(false);
+            const PAD = [0xEC, 0x11];
+            let i = 0;
+            while ((bb.len / 8) < totalDataCount) { bb.put(PAD[i % 2], 8); i++; }
+            const data = []; for (let k = 0; k < bb.buf.length; k++) data.push(bb.buf[k] & 0xFF);
+            let offset = 0, dc = [], ec = [];
+            for (const b of rs) {
+                const dbytes = data.slice(offset, offset + b.dataCount); offset += b.dataCount; dc.push(dbytes);
+                const rsPoly = Util.ecPoly(b.totalCount - b.dataCount);
+                const mod = new Poly(dbytes, rsPoly.len() - 1).mod(rsPoly);
+                const ebytes = new Array(rsPoly.len() - 1).fill(0);
+                const ml = mod.len();
+                for (let i2 = 0; i2 < ebytes.length; i2++) {
+                    const idx = i2 + (ml - ebytes.length);
+                    ebytes[i2] = idx >= 0 ? mod.get(idx) : 0;
+                }
+                ec.push(ebytes);
+            }
+            const maxDc = Math.max(...dc.map(a => a.length)), maxEc = Math.max(...ec.map(a => a.length));
+            const out = [];
+            for (let i3 = 0; i3 < maxDc; i3++) for (let r = 0; r < dc.length; r++) if (i3 < dc[r].length) out.push(dc[r][i3]);
+            for (let i4 = 0; i4 < maxEc; i4++) for (let r = 0; r < ec.length; r++) if (i4 < ec[r].length) out.push(ec[r][i4]);
+            return out;
+        },
+        _chooseMaskAndFill() {
+            let bestMask = 0, bestScore = 1e9;
+            for (let mask = 0; mask <= 7; mask++) {
+                const n = this.size, m = this.modules.map(row => row.slice());
+                const bytes = this._dataBytes(); let inc = -1, row = n - 1, bit = 7, idx = 0;
+                for (let col = n - 1; col > 0; col -= 2) {
+                    if (col === 6) col--;
+                    while (true) {
+                        for (let c = 0; c < 2; c++) {
+                            const cc = col - c; if (m[row][cc] === null) {
+                                let dark = false; if (idx < bytes.length) dark = ((bytes[idx] >>> bit) & 1) === 1;
+                                const masked = Util.mask(mask, row, cc) ? !dark : dark;
+                                m[row][cc] = masked;
+                                bit--; if (bit === -1) { idx++; bit = 7; }
+                            }
+                        }
+                        row += inc;
+                        if (row < 0 || row >= n) { row -= inc; inc = -inc; break; }
+                    }
+                }
+                const sc = score(m);
+                if (sc < bestScore) { bestScore = sc; bestMask = mask; this.modules = m; }
+            }
+            return bestMask;
+            function score(grid) {
+                const n = grid.length; let s = 0;
+                for (let r = 0; r < n; r++) { let run = 1; for (let c = 1; c < n; c++) { if (grid[r][c] === grid[r][c - 1]) run++; else { if (run >= 5) s += 3 + (run - 5); run = 1; } } if (run >= 5) s += 3 + (run - 5); }
+                for (let c = 0; c < n; c++) { let run = 1; for (let r = 1; r < n; r++) { if (grid[r][c] === grid[r - 1][c]) run++; else { if (run >= 5) s += 3 + (run - 5); run = 1; } } if (run >= 5) s += 3 + (run - 5); }
+                for (let r = 0; r < n - 1; r++) for (let c = 0; c < n - 1; c++) if (grid[r][c] === grid[r + 1][c] && grid[r][c] === grid[r][c + 1] && grid[r][c] === grid[r + 1][c + 1]) s += 3;
+                const hasPat = arr => {
+                    for (let i = 0; i <= arr.length - 11; i++) {
+                        const a = arr.slice(i, i + 11).map(x => x ? 1 : 0).join('');
+                        if (a === '10111010000' || a === '00001011101') return true;
+                    }
+                    return false;
+                };
+                for (let r = 0; r < n; r++) if (hasPat(grid[r])) s += 40;
+                for (let c = 0; c < n; c++) { const col = []; for (let r = 0; r < n; r++) col.push(grid[r][c]); if (hasPat(col)) s += 40; }
+                let dark = 0; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (grid[r][c]) dark++;
+                s += Math.floor(Math.abs((dark * 100 / (n * n)) - 50) / 5) * 10;
+                return s;
+            }
+        }
+    };
+
+    // expose QR globally
+    window.QR = QR;
+
+    // ---- Public helper: base QR ----
+    window.qrPngDataURL = function (text, { size = 256, margin = 4, ecc = 'M' } = {}) {
+        const qr = new QR(0, ecc);
+        qr.addData(text); qr.make();
+        const count = qr.size;
+        const tile = (size - 2 * margin) / count;
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000';
+        for (let r = 0; r < count; r++) {
+            for (let col = 0; col < count; col++) {
+                if (qr.modules[r][col]) {
+                    const px = Math.round(margin + col * tile);
+                    const py = Math.round(margin + r * tile);
+                    const w = Math.ceil(tile);
+                    const h = Math.ceil(tile);
+                    ctx.fillRect(px, py, w, h);
+                }
+            }
+        }
+
+        return c.toDataURL('image/png');
+    };
+
+    // ---- Public helper: QR with logo ----
+    // Generate a plain QR and return PNG data URL
+    window.qrPngDataURL = function (text, { size = 256, margin = 4, ecc = 'H' } = {}) {
+        const qr = new QR(0, ecc);
+        qr.addData(text);
+        qr.make();
+
+        const count = qr.size;
+        const tile = (size - 2 * margin) / count;
+
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+
+        // solid white background
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, size, size);
+
+        // draw QR modules
+        ctx.fillStyle = '#000';
+        for (let r = 0; r < count; r++) {
+            for (let col = 0; col < count; col++) {
+                if (qr.modules[r][col]) {
+                    const px = Math.round(margin + col * tile);
+                    const py = Math.round(margin + r * tile);
+                    const w = Math.ceil(tile);
+                    const h = Math.ceil(tile);
+                    ctx.fillRect(px, py, w, h);
+                }
+            }
+        }
+
+        return c.toDataURL('image/png');
+    };
+
+})();
+
+
+
+
+// Today in DD-MM-YYYY, default tz = Asia/Riyadh
+function todayDDMMYYYY(tz = 'Asia/Riyadh') {
+    const fmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+    // en-GB gives "15/09/2025" → swap slashes to dashes
+    return fmt.format(new Date()).replace(/\//g, '-');
+}
+
+// applicants = المصفوفة التي عندك
+function buildApplicantRows(applicants) {
+    // الأولوية: role === 'primary' ثم الباقي بترتيبهم
+    const sorted = [...applicants].sort((a, b) => (a.role === 'primary' ? -1 : 0) - (b.role === 'primary' ? -1 : 0));
+
+    return sorted.map((p, idx) => {
+        const firstPassport = (p.ids || []).find(id => id.type === 'جواز سفر') || p.ids?.[0] || {};
+        return {
+            "الرقم": String(idx + 1),                          // ترقيم 1..n
+            "الاسم": p.name || "",
+            "رقم الجواز": firstPassport.number || "",
+            "مكان الإصدار": firstPassport.issuer || "",
+            "التوقيع والبصمة": ""                              // يُترك فارغًا للتوقيع
+        };
+    });
+}
+
+function buildNoteApplicantRows(applicants) {
+    // الأولوية: role === 'primary' ثم الباقي بترتيبهم
+    const sorted = [...applicants].sort((a, b) => (a.role === 'primary' ? -1 : 0) - (b.role === 'primary' ? -1 : 0));
+
+    return sorted.map((p, idx) => {
+        const firstPassport = (p.ids || []).find(id => id.type === 'جواز سفر') || p.ids?.[0] || {};
+        return {
+            "الرقم": String(idx + 1),                          // ترقيم 1..n
+            "الاسم": p.name || "",
+            "رقم الجواز": firstPassport.number || "",
+            "مكان الإصدار": firstPassport.issuer || "",
+            "انتهاء صلاحية الجواز": firstPassport.expiry || ""                              // يُترك فارغًا للتوقيع
+        };
+    });
+}
+
+
+// ثم أرسل payload للـ PHP (fetch أو form submit كما تعمل الآن)
+
+// Step 5 → Next
+const ar_en_GROUP_ORDER = [
+    { ar: 'إفادة لمن يهمه الأمر', en: 'To Whom It May Concern' },
+    { ar: 'إقرار', en: 'Affidavit' },
+    { ar: 'إقرار مشفوع باليمين', en: 'Sworn Affidavit' },
+    { ar: 'توكيل', en: 'Power of Attorney' },
+    { ar: 'مخاطبة لتاشيرة دخول', en: 'Letter for Entry Visa' }
+];
+
+
+async function toBase64(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+
+function adjustPayloadForGroup(payload, group, lang, applicants, witnesses) {
+    // === توكيل / إقرار ===
+    if (group === 'توكيل' || group === 'إقرار' || group === 'إقرار مشفوع باليمين') {
+        if (witnesses.length >= 2 && window.universalappState.flag?.needWitnesses) {
+            payload["الشاهد_الأول"] = witnesses[0].name;
+            payload["هوية_الأول"] = witnesses[0].ids[0]?.number || "";
+            payload["الشاهد_الثاني"] = witnesses[1].name;
+            payload["هوية_الثاني"] = witnesses[1].ids[0]?.number || "";
+        }
+        if (applicants.length > 1) {
+            payload["docxfile"] = 'MultiAuth.docx';
+            payload['جدول_المتقدمين'] = buildApplicantRows(applicants);
+        }
+        if (!window.universalappState.flags?.needWitnesses) {
+            payload["docxfile"] = payload["docxfile"].replace('.docx', 'NoWitnesses.docx');
+        }
+        if (lang === 'en') {
+            payload["docxfile"] = 'SingleAuthEng.docx';
+        }
+    }
+
+    // === إفادة لمن يهمه الأمر ===
+    else if (group === 'إفادة لمن يهمه الأمر') {
+        payload["docxfile"] = (lang === 'ar')
+            ? 'CertificateArab.docx'
+            : 'CertificateEng.docx';
+    }
+
+    // === مذكرة لسفارة ===
+    else if (group && group.includes('مذكرة لسفارة')) {
+        const t1 = document.getElementById('fld_itext1')?.value || "";
+        payload['جدول_المتقدمين'] = buildNoteApplicantRows(applicants);
+        payload["الموضوع"] = payload["text"];
+        payload['الخاتمة'] = authenticater_text.value;
+        if (lang === 'ar') {
+            payload['dest'] = 'القنصلية العامة ل' + t1 + ' – جـدة';
+            payload["docxfile"] = 'NoteVerbalArab.docx';
+        } else {
+            payload['dest'] = 'To: The Consulate General of ' + t1 + ' in Jeddah';
+            payload["docxfile"] = 'NoteVerbalEng.docx';
+        }
+    }
+    console.log(payload);
+    return payload; // return for chaining if needed
+}
+
+
+// --- build payload from current UI state ---
+async function buildPayloadFromUI() {
+    const doc_id = window.universalappState.doc_id;
+    const qrUrl = "http://192.168.0.68:8000/view.php?id=" + encodeURIComponent(doc_id);
+    const qrImgUrl = "/qr.php?url=" + encodeURIComponent(qrUrl);
+    const qrDataUrl = await toBase64(qrImgUrl);
+
+    const witnesses = window.universalappState.witnesses || [];
+    const applicants = window.universalappState.applicants || [];
+    const text = document.getElementById('empText').value;
+    const group = window.universalappState.selected.mainGroup;
+    const lang = window.universalappState.lang;
+    function getEnglishEquivalent(arGroup) {
+        const item = ar_en_GROUP_ORDER.find(g => g.ar === arGroup);
+        return item ? item.en : arGroup;
+    }
+    
+    // Parse mission_Details JSON
+    let missionDetails = {};
+    try {
+        missionDetails = JSON.parse(window.comboData.settings[0].mission_Details || "{}");
+    } catch {
+        missionDetails = {};
+    }
+
+    // Build footer text
+    let footerParts = [];
+    if (missionDetails.missionAddr) footerParts.push(`العنوان: ${missionDetails.missionAddr}`);
+    if (missionDetails.missionPhone) footerParts.push(`تلفون: ${missionDetails.missionPhone}`);
+    if (missionDetails.missionFax) footerParts.push(`فاكس ${missionDetails.missionFax}`);
+    if (missionDetails.missionPO) footerParts.push(`ص . ب : ${missionDetails.missionPO}`);
+    if (missionDetails.missionPostal) footerParts.push(`الرمز البريدي: ${missionDetails.missionPostal}`);
+    let footerText = footerParts.join("    ");
+
+
+
+    let payload = {
+        "missionNameAr": missionDetails.missionNameAr,
+        "missionNameEn": missionDetails.missionNameEn,
+        "logo_png": "logo.jpg",   // optional
+        footer_text: footerText,
+        barcode_png: missionDetails.barcodeEnabled ? qrDataUrl : 'no data',
+        "lang": lang,
+        "output_format": "docx",
+        "docxfile": "SingleAuth.docx",
+        "رقم_المعاملة": doc_id,
+        "التاريخ_الميلادي": todayDDMMYYYY(),
+        "مقدم_الطلب": applicants[0]?.name || "",
+        "نص_المعاملة": text,
+        "text": text,
+        "التوثيق": authenticater_text.value,
+        "مدة_الاعتماد": "",
+        "صفة_الموقع": signer_role,
+        "موقع_المعاملة": signer,
+        "موقع_التوكيل": signer,
+        "الموثق": signer + '\n' + signer_role,
+        "نوع_المكاتبة": (lang === 'ar') ? group : getEnglishEquivalent(group)
+    };
+
+    // apply group-specific adjustments (same as before)
+    adjustPayloadForGroup(payload, group, lang, applicants, witnesses);
+
+    return payload;
+}
+
+async function generateAndDownloadDoc(payload) {
+    // 1. Save payload to DB (Auth or Collection, with PayloadJson)
+    const commentText = document.getElementById('comment_text')?.value || "";
+    payload["special_comment"] = commentText;
+    payload["caseId"] = localStorage.getItem("caseId"); 
+    console.log(payload["caseId"]);
+    await fetch("/docGenerator/save_document.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: JSON.stringify(payload)
+    });
+
+    // 2. Send to generator
+    const res = await fetch("/docGenerator/fill_docx.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const msg = await res.text();
+        alert("فشل إنشاء الملف: " + msg);
+        return;
+    }
+
+    // 3. Download result
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (payload["نوع_المكاتبة"] || "document") +
+                 " " + (payload["مقدم_المطلب"] || "") +
+                 "." + payload["output_format"];
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    // showStep(0);
+}
+
+document.getElementById('nextBtnStep5Emp')?.addEventListener('click', async () => {
+    const payload = await buildPayloadFromUI();
+    await generateAndDownloadDoc(payload);
+});
+
+async function regenerateDocFromDb(id, type) {
+    const res = await fetch(`/api/get_document.php?id=${id}&type=${type}`);
+    if (!res.ok) { alert("تعذر استرجاع البيانات"); return; }
+    const payload = await res.json();
+    await generateAndDownloadDoc(payload);
+}
+
+
+// document.getElementById('nextBtnStep5Emp')?.addEventListener('click', async () => {
+//     const doc_id = window.universalappState.doc_id;
+//     const qrUrl = "http://192.168.0.68:8000/view.php?id=" + encodeURIComponent(doc_id);
+
+//     // 1. Use your local PHP QR generator
+//     const qrImgUrl = "/qr.php?url=" + encodeURIComponent(qrUrl);
+
+//     // 2. Show preview (plain QR for now, no logo yet)
+//     const box = document.getElementById('qrPreview');
+//     box.innerHTML = '';
+//     const img = new Image();
+//     img.src = qrImgUrl;
+//     img.alt = 'QR preview';
+//     img.width = 64;
+//     box.appendChild(img);
+
+//     async function toBase64(url) {
+//         const res = await fetch(url);
+//         const blob = await res.blob();
+//         return new Promise((resolve) => {
+//             const reader = new FileReader();
+//             reader.onloadend = () => resolve(reader.result); // "data:image/png;base64,..."
+//             reader.readAsDataURL(blob);
+//         });
+//     }
+//     const qrDataUrl = await toBase64(qrImgUrl);
+//     // 3. If you want to embed QR into payload as a URL (simpler):
+//     // payload["barcode_png"] = qrImgUrl;
+//     // 4. Build payload (barcode_png is now the base64 image)
+//     const witnesses = window.universalappState.witnesses;
+//     const applicants = window.universalappState.applicants;
+//     const text = document.getElementById('empText').value;
+//     const group = window.universalappState.selected.mainGroup;
+//     const lang = window.universalappState.lang;
+
+//     let payload = {
+//         "footer_text": "تلفون:6055888 - فاكس 6548826    ص . ب : 480 – الرمز البريدي: 21411",
+//         "barcode_png": qrDataUrl,   // ✅ final QR with logo
+//         "lang": lang,
+//         "output_format": "docx",
+//         "docxfile": "SingleAuth.docx",
+//         "رقم_المعاملة": doc_id,
+//         "التاريخ_الميلادي": todayDDMMYYYY(),
+//         "مقدم_الطلب": applicants[0].name,
+//         "النص": text,
+//         "text": text,
+//         "التوثيق.": authenticater_text.value,        
+//         "مدة_الاعتماد": "",
+//         "الموثق": signer + '\n' + signer_role
+        
+//     };
+
+
+//     // === Adjust payload by group/lang ===
+//     function getEnglishEquivalent(arGroup) {
+//         const item = ar_en_GROUP_ORDER.find(g => g.ar === arGroup);
+//         return item ? item.en : arGroup;
+//     }
+
+//     if (lang === 'ar') {
+//         payload["نوع_المكاتبة"] = group;
+//     } else {
+//         payload["نوع_المكاتبة"] = getEnglishEquivalent(group);
+//     }
+//     console.log(window.universalappState);
+//     if (group === 'توكيل' || group === 'إقرار' || group === 'إقرار مشفوع باليمين') {
+//         if (witnesses.length >= 2 && window.universalappState.flag.needWitnesses) {
+//             payload["الشاهد_الأول"] = witnesses[0].name;
+//             payload["هوية_الأول"] = witnesses[0].ids[0].number;
+//             payload["الشاهد_الثاني"] = witnesses[1].name;
+//             payload["هوية_الثاني"] = witnesses[1].ids[0].number;
+//         }
+//         if (applicants.length > 1) {
+//             payload["docxfile"] = 'MultiAuth.docx';
+//             payload['جدول_المتقدمين'] = buildApplicantRows(applicants);
+//         }
+//         if (!window.universalappState.flags.needWitnesses) {
+//             payload["docxfile"] = payload["docxfile"].replace('.docx', 'NoWitnesses.docx');
+//         }
+//         if (lang === 'en') {
+//             payload["docxfile"] = 'SingleAuthEng.docx';
+//         }
+//     }
+//     else if (group === 'إفادة لمن يهمه الأمر') {
+//         payload["docxfile"] = (lang === 'ar') ? 'CertificateArab.docx' : 'CertificateEng.docx';
+//     }
+//     else if (group && group.includes('مذكرة لسفارة')) {
+//         const t1 = document.getElementById('fld_itext1').value;
+//         payload['جدول_المتقدمين'] = buildNoteApplicantRows(applicants);
+//         payload["الموضوع"] = text;
+//         payload['الخاتمة'] = authenticater_text.value;
+//         if (lang === 'ar') {
+//             payload['dest'] = 'القنصلية العامة ل' + t1 + ' – جـدة';
+//             payload["docxfile"] = 'NoteVerbalArab.docx';
+//         } else {
+//             payload['dest'] = 'To: The Consulate General of ' + t1 + ' in Jeddah';
+//             payload["docxfile"] = 'NoteVerbalEng.docx';
+//         }
+//     }
+//     console.log(group, lang, payload["docxfile"]);
+//     // === Send to backend ===
+//     const res = await fetch('/docGenerator/fill_docx.php', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+//         body: JSON.stringify(payload)
+//     });
+
+//     if (!res.ok) {
+//         const msg = await res.text();
+//         alert('فشل إنشاء الملف: ' + msg);
+//         return;
+//     }
+
+//     const blob = await res.blob();
+//     const url = URL.createObjectURL(blob);
+//     const a = document.createElement("a");
+//     a.href = url;
+//     a.download = group + " " + applicants[0].name + '.' + payload["output_format"];
+//     document.body.appendChild(a);
+//     a.click();
+//     a.remove();
+//     URL.revokeObjectURL(url);
+
+//     showStep(0);
+// });

@@ -42,12 +42,15 @@ try {
   // 3) Fallback (if ReqID is null): try old logic by ModelID = templateId
   $sqlFallback = "
     SELECT TOP (1)
-      PR.[ID]        AS ReqID,
-      PR.[ModelID]   AS ModelID,
-      PR.[توضيح_المعاملة]
-    FROM [dbo].[TableProcReq] PR
-    WHERE PR.[ModelID] = :mid AND PR.[توضيح_المعاملة] IS NOT NULL
-  ";
+        p.id, p.ModelID, p.توضيح_المعاملة
+    FROM dbo.TableAddModel AS m
+    LEFT JOIN dbo.TableProcReq AS p
+      ON p.المعاملة COLLATE Arabic_100_CI_AI_KS
+        = (m.altColName COLLATE Arabic_100_CI_AI_KS
+            + N'-'
+            + m.altSubColName COLLATE Arabic_100_CI_AI_KS)
+    where m.id = :mid AND p.[توضيح_المعاملة] IS NOT NULL
+      ";
   $st = $pdo->prepare($sqlFallback);
   $st->execute([':mid' => $templateId]);
   $row = $st->fetch();

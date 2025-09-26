@@ -1,9 +1,4 @@
-﻿-- Create a small schema to keep office views tidy (safe if it already exists)
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'office') EXEC('CREATE SCHEMA office');
-GO
-
--- Unified list: TableAuth (توكيل) ∪ TableCollection (باقي المجموعات)
-CREATE OR ALTER VIEW office.vw_OfficeUnified AS
+﻿ALTER VIEW office.vw_OfficeUnified AS
 SELECT
   N'Auth'                   AS OfficeTable,     -- which base table
   A.id                      AS OfficeId,
@@ -16,18 +11,18 @@ SELECT
   A.[حالة_الارشفة]         AS ArchStatus,
   A.[طريقة_الطلب]          AS Method,
   -- lightweight tags for UI highlighting
-  CASE LTRIM(RTRIM(A.[حالة_الارشفة]))
-    WHEN N'جديد'          THEN 'status-new'
-    WHEN N'قيد المراجعة'  THEN 'status-review'
-    WHEN N'مؤرشف'         THEN 'status-archived'
-    WHEN N'مرفوض'         THEN 'status-rejected'
-    ELSE 'status-unknown'
+  CASE 
+    WHEN A.[مقدم_الطلب] IS NULL          THEN N'معاملة جديدة'
+    WHEN A.[مقدم_الطلب] IS NOT NULL AND A.[حالة_الارشفة] <> N'مؤرشف نهائي'   THEN N'قيد المعالجة'
+    WHEN A.[حالة_الارشفة] = N'مؤرشف نهائي'   THEN N'مؤرشف نهائي'    
+    ELSE N'غير مؤرشف'
   END AS StatusTag,
-  CASE LTRIM(RTRIM(A.[طريقة_الطلب]))
-    WHEN N'الكتروني' THEN 'method-online'
-    WHEN N'حضوري'    THEN 'method-inperson'
-    ELSE 'method-other'
-  END AS MethodTag
+  
+  CASE 
+    WHEN A.[طريقة_الطلب] = N'الكتروني' THEN N'اونلاين'
+    WHEN A.[طريقة_الطلب] = N'عن طريق أحد مندوبي القنصلية'    THEN N'بواسطة مندوب'
+    ELSE N'حضور مباشر'
+    END AS MethodTag
 FROM dbo.TableAuth AS A
 
 UNION ALL
@@ -43,22 +38,18 @@ SELECT
   C.[التاريخ_الميلادي]    AS [Date],
   C.[حالة_الارشفة]        AS ArchStatus,
   C.[طريقة_الطلب]         AS Method,
-  CASE LTRIM(RTRIM(C.[حالة_الارشفة]))
-    WHEN N'جديد'          THEN 'status-new'
-    WHEN N'قيد المراجعة'  THEN 'status-review'
-    WHEN N'مؤرشف'         THEN 'status-archived'
-    WHEN N'مرفوض'         THEN 'status-rejected'
-    ELSE 'status-unknown'
+  CASE 
+    WHEN C.[مقدم_الطلب] IS NULL          THEN N'معاملة جديدة'
+    WHEN C.[مقدم_الطلب] IS NOT NULL AND C.[حالة_الارشفة] <> N'مؤرشف نهائي'   THEN N'قيد المعالجة'
+    WHEN C.[حالة_الارشفة] = N'مؤرشف نهائي'   THEN N'مؤرشف نهائي'    
+    ELSE N'غير مؤرشف'
+
   END AS StatusTag,
-  CASE LTRIM(RTRIM(C.[طريقة_الطلب]))
-    WHEN N'الكتروني' THEN 'method-online'
-    WHEN N'حضوري'    THEN 'method-inperson'
-    ELSE 'method-other'
+  CASE 
+    WHEN C.[طريقة_الطلب] = N'الكتروني' THEN N'اونلاين'
+    WHEN C.[طريقة_الطلب] = N'عن طريق أحد مندوبي القنصلية'    THEN N'بواسطة مندوب'
+    ELSE N'حضور مباشر'
   END AS MethodTag
 FROM dbo.TableCollection AS C;
 GO
 
-
--- If you list/sort/filter often by التاريخ_الميلادي, حالة_الارشفة, طريقة_الطلب, مقدم_الطلب:
-CREATE INDEX IX_TableAuth_List   ON dbo.TableAuth([التاريخ_الميلادي])  INCLUDE([مقدم_الطلب],[رقم_التوكيل],[رقم_الهوية],[حالة_الارشفة],[طريقة_الطلب]);
-CREATE INDEX IX_TableColl_List   ON dbo.TableCollection([التاريخ_الميلادي]) INCLUDE([مقدم_الطلب],[رقم_المعاملة],[رقم_الهوية],[حالة_الارشفة],[طريقة_الطلب]);

@@ -9,6 +9,8 @@
 // ---------- Config ----------
 const OFFICE_ID = '080'; // TODO: set from server/user profile if dynamic
 let appState = [];
+let new_case = false;
+let step5Fields = 0;
 /* ========= LocalStorage keys ========= */
 const LS = {
     saved: 'ahwal.currentStep',   // last viewed step (we won't exceed truth)
@@ -20,10 +22,12 @@ const LS = {
     caseId: 'caseId',
     extRef: 'externalRef',
     userId: 'userId',
-    uploadsDone: 'uploadsDone'
+    uploadsDone: 'uploadsDone',
+    ar_diplomat: 'ar_diplomat',
+    en_diplomat: 'en_diplomat',
+    ar_diplomat_job: 'ar_diplomat_job',
+    en_diplomat_job: 'en_diplomat_job',
 };
-
-// === AFTER your existing LS object ===
 
 // Key map (only define once)
 window.LSK ??= {
@@ -44,23 +48,23 @@ function clearUploadsUI() {
 
 
 // One-time migration from legacy keys -> unified keys
-(function migrateLSKeys() {
-    const get = (k) => (LS?.get ? LS.get(k) : localStorage.getItem(k) || '');
-    const set = (k, v) => (LS?.set ? LS.set(k, v) : localStorage.setItem(k, v ?? ''));
+// (function migrateLSKeys() {
+//     const get = (k) => (LS?.get ? LS.get(k) : localStorage.getItem(k) || '');
+//     const set = (k, v) => (LS?.set ? LS.set(k, v) : localStorage.setItem(k, v ?? ''));
 
-    const pairs = [
-        ['selectedMainGroup', LSK.main],
-        ['selectedAltColName', LSK.altCol],
-        ['selectedAltSubColName', LSK.altSub],
-        ['selectedTemplateId', LSK.tpl],
-        ['docLang', LSK.lang],
-    ];
-
-    for (const [oldK, newK] of pairs) {
-        const v = localStorage.getItem(oldK);
-        if (v != null && !get(newK)) set(newK, v);
-    }
-})();
+//     const pairs = [
+//         ['selectedMainGroup', LSK.main],
+//         ['selectedAltColName', LSK.altCol],
+//         ['selectedAltSubColName', LSK.altSub],
+//         ['selectedTemplateId', LSK.tpl],
+//         ['docLang', LSK.lang],
+//     ];
+//     console.log('mograte');
+//     for (const [oldK, newK] of pairs) {
+//         const v = localStorage.getItem(oldK);
+//         if (v != null && !get(newK)) set(newK, v);
+//     }
+// })();
 
 
 // at top-level near other globals
@@ -122,11 +126,11 @@ const CasesUI = {
         localStorage.setItem('empAutoRoute', '0');
 
         // (re)load the proper list
-        if (role === 'employee') {
-            if (typeof loadOfficeList === 'function') loadOfficeList({});
-        } else {
-            if (typeof loadCases === 'function') loadCases({});
-        }
+        // if (role === 'employee') {
+        //     if (typeof loadOfficeList === 'function') loadOfficeList({});
+        // } else {
+        //     if (typeof loadCases === 'function') loadCases({});
+        // }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -138,13 +142,14 @@ const CasesUI = {
                 setRoleUI(role);
             });
         }
+
     });
 })();
 
 
 async function loadOfficeList(params = {}) {
-    document.getElementById('step10').hidden = false;
-    document.getElementById('step0').hidden = true;
+    document.getElementById('step10').style.display = 'block';
+    document.getElementById('step0').style.display = 'none';
     document.getElementById('roleToggle_row').hidden = false;
 
     const userId = Number(localStorage.getItem('userId') || 2); // استبدلها بالجلسة لاحقًا
@@ -158,6 +163,11 @@ async function loadOfficeList(params = {}) {
     body.innerHTML = '';
     note.hidden = !data.autoTodayApplied;
 
+    const mobile = document.getElementById('casesOfficeTableMobile');
+    const esc = s => String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    if (mobile) mobile.innerHTML = '';
     (data.rows || []).forEach(r => {
 
         const tr = document.createElement('tr');
@@ -174,29 +184,63 @@ async function loadOfficeList(params = {}) {
         tr.addEventListener('click', () => {
             // open detail later via api_office_case_detail.php?table=...&id=...
             console.log('Open', r.OfficeTable, r.OfficeId);
-            openOfficeCase(r.OfficeId);
+            openOfficeCase(r.OfficeId, r.MainGroup);
         });
         body.appendChild(tr);
+        if (mobile) {
+            const card = document.createElement('article');
+            card.className = 'm-case';
+            card.dir = 'rtl';
+            card.innerHTML = `
+        <div class="m-case-head">
+          <strong>قضية #${r.OfficeNumber}</strong>
+          <time>${r.Date}</time>
+        </div>
+        <div class="m-case-meta">
+          <div><span class="k">المجموعة:</span> <span class="v">${esc(r.MainGroup) || '-'}</span></div>
+          <div><span class="k">الاسم:</span> <span class="v">${r.ApplicantName || '-'}</span></div>
+        </div>
+        <div class="m-case-actions">
+          <button class="btn btn-primary" type="button">فتح</button>
+        </div>
+      `;
+            card.querySelector('.btn')?.addEventListener('click', () => { if (r.OfficeId) openOfficeCase(r.OfficeId, r.MainGroup); });
+            mobile.appendChild(card);
+        }
     });
+
+
+    
+
+
+
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('searchBtn')?.addEventListener('click', () => {
-        loadOfficeList({
-            q: document.getElementById('q').value.trim(),
-            mainGroup: document.getElementById('mg').value,
-            dateFrom: document.getElementById('from').value,
-            dateTo: document.getElementById('to').value
-        });
-    });
-    // initial load
-    loadOfficeList({});
-});
+// document.addEventListener('DOMContentLoaded', () => {
+//     document.getElementById('searchBtn')?.addEventListener('click', () => {
+//         loadOfficeList({
+//             q: document.getElementById('q').value.trim(),
+//             mainGroup: document.getElementById('mg').value,
+//             dateFrom: document.getElementById('from').value,
+//             dateTo: document.getElementById('to').value
+//         });
+//     });
+//     // // initial load
+//     // loadOfficeList({});
+// });
 
+document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const group = urlParams.get("group");
+        const id = urlParams.get("id");
+        console.log(id, group);
+        openOfficeCase(Number(id), group);
+        
+    });
 
 async function loadCases(opts = {}) {
-    document.getElementById('step0').hidden = false;
-    document.getElementById('step10').hidden = true;
+    document.getElementById('step0').style.display = 'block';
+    document.getElementById('step10').style.display = 'none';
     document.getElementById('roleToggle_row').hidden = false;
 
 
@@ -227,27 +271,91 @@ async function loadCases(opts = {}) {
     renderPager();
 }
 
-function renderCasesTable(items) {
+function personCard(p, idx, section) {
+    const div = document.createElement('div');
+    div.className = 'p-card';
+
+    const id = p.ids?.[0] || {};
+    div.innerHTML = `
+    <h4>${p.name || '(بدون اسم)'} <span class="muted">• ${section === 'witnesses' ? 'شاهد' : section === 'authenticated' ? 'موكل' : 'مقدم طلب '}</span></h4>
+    <div class="p-meta">
+      <div>${p.job ? ('المهنة: ' + p.job) : ''}</div>
+      <div>${p.nationality ? ('الجنسية: ' + p.nationality) : ''}</div>
+      <div>${id.type ? ('الهوية: ' + id.type) : ''} ${id.number ? ('— ' + id.number) : ''}</div>
+      <div>${id.expiry ? ('انتهاء الصلاحية: ' + id.expiry) : ''}</div>
+    </div>
+    <div class="p-actions">
+      <button class="btn btn-sm btn-ghost" data-act="edit">تعديل</button>
+      <button class="btn btn-sm btn-danger" data-act="del">حذف</button>
+    </div>
+  `;
+    div.querySelector('[data-act="edit"]').onclick = () => openPartyModal(section, idx, p);
+    div.querySelector('[data-act="del"]').onclick = () => deleteParty(section, idx);
+    return div;
+}
+
+function renderCasesTable(items = []) {
     const body = document.querySelector('#casesTable tbody');
     const empty = document.getElementById('casesEmpty');
-    body.innerHTML = '';
-    if (!items.length) { empty.hidden = false; return; }
-    empty.hidden = true;
+    const mobile = document.getElementById('casesTableMobile');
+
+    if (body) body.innerHTML = '';
+    if (mobile) mobile.innerHTML = '';
+
+    const hasRows = Array.isArray(items) && items.length > 0;
+    if (empty) empty.hidden = hasRows;
+
+    if (!hasRows) return;
+
+    const esc = s => String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
     items.forEach(it => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-      <td>${it.caseId ?? ''}</td>
-      <td>${it.applicantName ?? ''}</td>
-      <td>${it.idNumber ?? ''}</td>
-      <td>${it.altColName ?? ''}</td>
-      <td>${it.altSubColName ?? ''}</td>
-      <td>${it.date ?? ''}</td>
-    `;
-        tr.addEventListener('click', () => openCase(it._meta?.caseId));
-        body.appendChild(tr);
+        // ---- normalize fields ----
+        const caseId = it._meta?.caseId ?? it.caseId ?? it.CaseID ?? it.id ?? '';
+        const group = it.altColName ?? it.group ?? it.mainGroup ?? '';
+        const type = it.altSubColName ?? it.type ?? '';
+        const rawDt = it.date ?? it.CreatedAt ?? it.createdAt ?? '';
+        const date = (rawDt && String(rawDt).length >= 10) ? String(rawDt).slice(0, 10) : String(rawDt || '');
+
+        // ---- desktop row ----
+        if (body) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+        <td>${esc(caseId)}</td>
+        <td>${esc(group)}</td>
+        <td>${esc(type)}</td>
+        <td>${esc(date)}</td>
+      `;
+            tr.addEventListener('click', () => { if (caseId) openCase(caseId); });
+            body.appendChild(tr);
+        }
+
+        // ---- mobile card ----
+        if (mobile) {
+            const card = document.createElement('article');
+            card.className = 'm-case';
+            card.dir = 'rtl';
+            card.innerHTML = `
+        <div class="m-case-head">
+          <strong>قضية #${esc(caseId)}</strong>
+          <time>${esc(date)}</time>
+        </div>
+        <div class="m-case-meta">
+          <div><span class="k">المجموعة:</span> <span class="v">${esc(group) || '-'}</span></div>
+          <div><span class="k">النوع:</span> <span class="v">${esc(type) || '-'}</span></div>
+        </div>
+        <div class="m-case-actions">
+          <button class="btn btn-primary" type="button">فتح</button>
+        </div>
+      `;
+            card.querySelector('.btn')?.addEventListener('click', () => { if (caseId) openCase(caseId); });
+            mobile.appendChild(card);
+        }
     });
 }
+
 
 function renderPager() {
     const pgInfo = document.getElementById('pgInfo');
@@ -259,14 +367,28 @@ function renderPager() {
     next.disabled = (CasesUI.page >= pages);
 }
 
-async function openOfficeCase(officeId, go_to_one = true) {
+async function openOfficeCase(officeId, MainGroup = 'توكيل', go_to_one = true) {
+    console.log('openOfficeCase');
     if (!officeId) return;
-    const res = await fetch('api_office_case_detail.php?id=' + encodeURIComponent(officeId));
-    if (!res.ok) { alert('تعذر فتح بيانات المكتب'); return; }
+
+    // Build query with proper encoding (Arabic-safe)
+    const qs = new URLSearchParams({
+        id: String(officeId),
+        mainGroup: MainGroup || 'توكيل',
+    });
+    // console.log(mainGroup);
+    const res = await fetch(`api_office_case_detail.php?${qs.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) { return; }
+
     const data = await res.json();
 
-    // You can reuse the exact same body from openCase(data.case.caseId) after the fetch:
+    // keep your existing state fill
+
     appState = {
+        doc_id: data.case?.doc_id ?? null,
         caseId: data.case?.caseId,
         userId: data.case?.userId ?? 0,
         lang: (data.details?.model?.langLabel === 'الانجليزية') ? 'en' : 'ar',
@@ -279,7 +401,7 @@ async function openOfficeCase(officeId, go_to_one = true) {
         applicants: (data.party?.applicants || []).map((a, i) => ({
             role: i === 0 ? 'primary' : 'co',
             name: a?.name ?? '',
-            sex: a?.sex ?? null,                 // 'M' | 'F' | null
+            sex: a?.sex ?? null,
             job: a?.job ?? '',
             nationality: a?.nationality ?? '',
             residenceStatus: a?.residenceStatus ?? '',
@@ -293,24 +415,21 @@ async function openOfficeCase(officeId, go_to_one = true) {
                 }]
                 : []
         })),
-
         authenticated: (data.party?.authenticated || []).map(p => ({
             name: p?.name ?? '',
-            sex: p?.sex ?? null,                 // 'M' | 'F'
+            sex: p?.sex ?? null,
             nationality: p?.nationality ?? '',
             ids: (Array.isArray(p?.ids) && p.ids.length)
                 ? [{ type: p.ids[0]?.type ?? 'جواز سفر', number: p.ids[0]?.number ?? '' }]
                 : []
         })),
-
         witnesses: (data.party?.witnesses || []).map(w => ({
             name: w?.name ?? '',
-            sex: w?.sex ?? null, // 'M' | 'F' | null
+            sex: w?.sex ?? null,
             ids: (Array.isArray(w?.ids) && w.ids.length)
                 ? [{ type: w.ids[0]?.type ?? 'جواز سفر', number: w.ids[0]?.number ?? '' }]
                 : []
         })),
-
         answers: data.details?.answers || {},
         flags: {
             needAuthenticated: !!data.details?.requirements?.needAuthenticated,
@@ -323,15 +442,16 @@ async function openOfficeCase(officeId, go_to_one = true) {
     set(LS.extRef, String(data.case?.externalRef ?? ''));
     set(LS.userId, String(data.case?.userId ?? ''));
     set(LS.lang, appState.lang);
+
     set(LS.tpl, String(appState.modelId ?? ''));
-    set(LS.main, data.details.model.mainGroup || '');
-    set(LS.altCol, data.details.model.altColName ?? '');
-    set(LS.altSub, data.details.model.altSubColName ?? '');
+    set(LS.main, MainGroup || '');
+    set(LS.altCol, data.details?.model?.altColName ?? '');
+    set(LS.altSub, data.details?.model?.altSubColName ?? '');
     set(LS.uploadsDone, '0');
 
     allowLeaveStep0('open-case');
-    if (go_to_one)
-        showStep(1);
+    if (go_to_one) showStep(1);
+
     window.universalappState = appState;
     return appState;
 }
@@ -381,6 +501,7 @@ async function openCase(caseId) {
     set(LS.extRef, String(data.case?.externalRef ?? ''));
     set(LS.userId, String(data.case?.userId ?? ''));
     set(LS.lang, String(data.case?.lang ?? '')) || 'ar'; // store 'ar' | 'en'
+    console.log('online cases', appState.modelId)
     set(LS.tpl, String(appState.modelId ?? ''));
     set(LS.main, data.details.model.mainGroup || '');
     set(LS.altCol, data.details.model.altColName ?? '');
@@ -410,16 +531,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pgPrev')?.addEventListener('click', () => {
         if (CasesUI.page > 1) { CasesUI.page--; loadCases(); }
     });
-    document.getElementById('pgNext')?.addEventListener('click', () => {
-        CasesUI.page++;
-        let role = localStorage.getItem('role')
-        console.log(role);
-        if (role === 'employee') {
-            if (typeof loadOfficeList === 'function') loadOfficeList({});
-        } else {
-            if (typeof loadCases === 'function') loadCases({});
-        }
-    });
+    // document.getElementById('pgNext')?.addEventListener('click', () => {
+    //     CasesUI.page++;
+    //     let role = localStorage.getItem('role')
+    //     console.log(role);
+    //     if (role === 'employee') {
+    //         if (typeof loadOfficeList === 'function') loadOfficeList({});
+    //     } else {
+    //         if (typeof loadCases === 'function') loadCases({});
+    //     }
+    // });
 
     // تحميل أولي
 
@@ -507,6 +628,20 @@ function getLangCode() {
     const ar = raw.replace(/[إأآ]/g, 'ا').replace(/\s+/g, '');
     if (ar === 'الانجليزية' || ar === 'انجليزية') return 'en';
     return 'ar';
+}
+
+function getLangArabCode() {
+    const v = get(LS.lang);
+    console.log(v);
+    if (!v) return 'العربية';
+    const raw = String(v).trim();
+    const latin = raw.toLowerCase();
+    if (latin === 'en' || latin.includes('english'))
+        return 'الانجليزية';
+    if (latin === 'ar' || latin.includes('arabic'))
+        return 'العربية';
+
+    return 'العربية';
 }
 
 /* ========= derive the real step from state ========= */
@@ -621,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // initial sync (and resync after first render)
     syncMobileStepper();
+
 });
 
 // IMPORTANT: call this at the end of your goToStep(n) function
@@ -639,42 +775,90 @@ function allowLeaveStep0(reason) {      // call this before leaving list
     step0ExitReason = reason || 'user';
 
 }
+// ---- drop-in replacement ----
+const STEP_RELOAD_GUARD_KEY = 'stepReloadGuard';
+const RELOADABLE_STEPS = new Set([2, 3, 4, 5, 6, 7]);
+let __showStepBusy = false;
 
-function showStep(n) {
+async function showStep(n) {
+    n = Number(n);
 
+    if (__showStepBusy) {
+        console.warn('[showStep] blocked (busy), requested:', n);
+
+        return;
+    }
+    __showStepBusy = true;
+
+    // one-reload guard (consume only if it matches this step)
+    let justReloaded = false;
+    try {
+        const raw = sessionStorage.getItem(STEP_RELOAD_GUARD_KEY);
+        if (raw) {
+            const g = JSON.parse(raw);
+            if (g && g.step === n && (Date.now() - g.ts) < 10000) {
+                justReloaded = true;
+                sessionStorage.removeItem(STEP_RELOAD_GUARD_KEY);
+            }
+        }
+    } catch { }
 
     // hide all, show target
-    $$('section[id^="step"]').forEach(sec => sec.hidden = true);
-    const target = $(panelId(n));
-    if (target) target.hidden = false;
+    document.querySelectorAll('section[id^="step"]').forEach(sec => sec.hidden = true);
 
-    highlightStepper(n);
-    set(LS.saved, String(n));
-    if(n > 0)
-        document.getElementById('roleToggle_row').hidden = true;
-    else 
-        document.getElementById('roleToggle_row').hidden = false;
+    const target = document.getElementById(`step${n}`) || (typeof panelId === 'function' ? document.querySelector(panelId(n)) : null);
+    if (target)
+        target.hidden = false;
+    else console.warn('[showStep] panel not found for step', n);
 
-    if (n === 0) initStep0();
-    if (n === 1) initStep1();
-    if (n === 2) initStep2();
-    if (n === 3) initStep3();
-    if (n === 4) initStep4();
-    if (n === 5) initStep5();
-    if (n === 6) initStep6();
-    if (n === 7) initStep7();
+    // UI state
+    if (typeof highlightStepper === 'function') highlightStepper(n);
+    if (typeof set === 'function' && typeof LS !== 'undefined') set(LS.saved, String(n));
+    const roleRow = document.getElementById('roleToggle_row');
+    if (roleRow) roleRow.hidden = n > 0;
+    const step0 = document.getElementById('step0');
+    const step10 = document.getElementById('step10');
+    if (n > 0) {
+        if(step0)
+            step0.style.display = 'none';
+        if(step10)
+            step10.style.display = 'none';
+    }
+    // run init (await if async)
+    try {
+        const inits = {
+            0: (typeof initStep0 === 'function') ? initStep0 : null,
+            1: (typeof initStep1 === 'function') ? initStep1 : null,
+            2: (typeof initStep2 === 'function') ? initStep2 : null,
+            3: (typeof initStep3 === 'function') ? initStep3 : null,
+            4: (typeof initStep4 === 'function') ? initStep4 : null,
+            5: (typeof initStep5 === 'function') ? initStep5 : null,
+            6: (typeof initStep6 === 'function') ? initStep6 : null,
+            7: (typeof initStep7 === 'function') ? initStep7 : null,
+        };
+        const fn = inits[n];
+        const ret = fn ? fn() : null;
+        if (ret && typeof ret.then === 'function') await ret;
+    } catch (e) {
+        console.error('[showStep] init error on step', n, e);
+    }
 
-    syncMobileStepper();
+    if (typeof syncMobileStepper === 'function') syncMobileStepper();
 
+    // make sure step 1 stays visible (paint next frame)
+    requestAnimationFrame(() => {
+        if (target) target.hidden = false;
+    });
+
+    // reload policy: NEVER on 0–1; at most once on 2–7
+    if (RELOADABLE_STEPS.has(n) && !justReloaded) {
+        sessionStorage.setItem(STEP_RELOAD_GUARD_KEY, JSON.stringify({ step: n, ts: Date.now() }));
+        setTimeout(() => location.reload(), 50);
+    }
+
+    // unlock calls after a brief tick (avoid re-entrant flips)
+    setTimeout(() => { __showStepBusy = false; }, 150);
 }
-
-// document.addEventListener('DOMContentLoaded', () => {
-//     const saved = Number(localStorage.getItem(LS.saved) || 0); // default to list
-
-//     showStep(saved, { force: true });
-// });
-
-
 
 /* Allow clicking earlier steps to view them */
 function wireStepperClicks() {
@@ -688,12 +872,20 @@ function wireStepperClicks() {
     });
 }
 
-
 /* ========= RESET (عملية جديدة) if you add a button with this id ========= */
+$('#btnNewProcess10')?.addEventListener('click', () => {
+    const keep = new Set([LS.userId]); // preserve language & user id
+    Object.values(LS).forEach(k => { if (!keep.has(k)) del(k); });
+
+    new_case = true;
+    showStep(1);
+});
+
 $('#btnNewProcess')?.addEventListener('click', () => {
     const keep = new Set([LS.userId]); // preserve language & user id
     Object.values(LS).forEach(k => { if (!keep.has(k)) del(k); });
-    showStep(0);
+    new_case = true;
+    showStep(1);
 });
 
 /* ========= STEP 2 (main/alt selection) ========= */
@@ -704,6 +896,58 @@ const MAIN_GROUP_ORDER = [
     'توكيل',
     'مخاطبة لتاشيرة دخول'
 ];
+const empText = document.getElementById("empText");
+
+if (empText) {
+    empText.addEventListener("input", checkMixedLanguages);
+}
+
+function checkMixedLanguages() {
+    const text = empText.value || "";
+
+    const inform_user = document.getElementById('inform-user');
+    if (!inform_user) return;
+
+    inform_user.style.display = 'none';
+    inform_user.innerText = "";
+
+    // --- Find Arabic & English words
+    const arabicWords = text.match(/[\u0600-\u06FF]+/g) || [];
+    const englishWords = text.match(/[A-Za-z]+/g) || [];
+
+    const significantArabic = arabicWords.filter(w => w.length > 1);
+    const significantEnglish = englishWords.filter(w => w.length > 1);
+
+    const arCount = significantArabic.length;
+    const enCount = significantEnglish.length;
+
+    if (arCount > 0 && enCount > 0) {
+        let minorityWords = [];
+        let minorityLang = "";
+
+        if (arCount > enCount) {
+            minorityWords = significantEnglish;
+            minorityLang = "English";
+        } else if (enCount > arCount) {
+            minorityWords = significantArabic;
+            minorityLang = "Arabic";
+        } else {
+            // equal case → just pick one (e.g. English)
+            minorityWords = significantEnglish;
+            minorityLang = "English";
+        }
+
+        // pick up to 3 examples
+        const examples = minorityWords.slice(0, 3).join(", ");
+
+        inform_user.innerText =
+            `⚠️ هذا النص يحتوي على كلمات بالعربية والانجليزية ` +            
+            `مثل  ${minorityLang}: ${examples}`;
+
+        inform_user.style.display = 'flex';
+    }
+}
+
 
 function iconForMain(name) {
     if (name === 'إفادة لمن يهمه الأمر') return 'ℹ️';
@@ -779,14 +1023,25 @@ async function initStep0() {
     // keep step 1 disabled while on list
 
     set(LS.lang, '');
-    document.getElementById('roleToggle_row').hidden = false;
+    const roleToggle_row = document.getElementById('roleToggle_row');
+    if (roleToggle_row)
+        roleToggle_row.style.display = 'flex';
+    else
+        return;
     document.querySelector('.stepper-item[data-step="1"]')
         ?.setAttribute('disabled', '');
     let role = localStorage.getItem('role')
     if (role === 'employee') {
+        console.log('initStep0');
+        document.getElementById('step10').style.display = 'block';
+        document.getElementById('step0').style.display = 'none';
         if (typeof loadOfficeList === 'function') await loadOfficeList({});
+
+
     } else {
         if (typeof loadCases === 'function') await loadCases({});
+        document.getElementById('step10').style.display = 'none';
+        document.getElementById('step0').style.display = 'block';
     }
 
 
@@ -837,20 +1092,16 @@ function applyLangRadioFromLS() {
 async function initStep1() {
     // Read the stored language value (e.g., 'العربية' | 'الانجليزية' | 'ar' | 'en')
     const lang = get(LS.lang);
-    console.log('lang from LS:', lang);
-
     // If no language chosen yet, go to Step 0 (via showStep so UI state stays consistent)
-    if (lang == null || lang === '' || lang === 'null') {
+    if (!new_case && (lang == null || lang === '' || lang === 'null')) {
         showStep(0);            // <- don't call initStep0() directly
         return;
     }
-
-
-    document.getElementById('roleToggle_row').hidden = true;
-
+    document.getElementById('roleToggle_row').style.display = 'none';
+    document.getElementById('step0').style.display = 'none';
+    document.getElementById('step10').style.display = 'none';
+    console.log('hide list');
     applyLangRadioFromLS();
-
-    // any other step-1 setup here (don’t call showStep(1) from here)
 }
 
 
@@ -859,16 +1110,16 @@ async function initStep1() {
 async function initStep2() {
     loadMainGroups();
     renderStep2SelectionSummary();
-
+    console.log(get(LS.tpl));
     const tpl = localStorage.getItem(LS.tpl);
-    const altCol = localStorage.getItem(LS.altCol);
-    const altSub = localStorage.getItem(LS.altSub);
-    console.log(altCol, altSub);
+    console.log(tpl);
     if (tpl) {
+        console.log('fetchDealExplanationByTemplateId');
         const info = await fetchDealExplanationByTemplateId(tpl);
         showDealExplanation(info || '');
         document.querySelector('.stepper-item[data-step="3"]')?.removeAttribute('disabled');
     }
+    console.log(get(LS.tpl));
 }
 
 /* ===== altCol modal ===== */
@@ -913,7 +1164,7 @@ async function loadAltCols(mainGroupName) {
 
     grid.innerHTML = '';
     empty.hidden = true;
-
+    console.log(getLangArabCode());
     const url = './api_altcols.php?lang=' + encodeURIComponent(getLangCode()) +
         '&group=' + encodeURIComponent(mainGroupName);
     const res = await fetch(apiUrl(url));
@@ -923,26 +1174,37 @@ async function loadAltCols(mainGroupName) {
     const data = await res.json();
     const items = Array.isArray(data.items) ? data.items : [];
     if (!items.length) { empty.hidden = false; return; }
-
+    let altgroup = '';
+    let AltcolCount = 0;
     items.forEach(it => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'card-item';
         btn.setAttribute('role', 'listitem');
         btn.innerHTML = `
-      <div class="icon-circle">📁</div>
-      <div class="card-body">
-        <div class="card-title-sm">${it.name}</div>
-        <div class="badge">الأنواع: ${it.subCount}</div>
-      </div>
-    `;
+            <div class="icon-circle">📁
+            </div>
+            <div class="card-body">
+                <div class="card-title-sm">${it.name}</div>
+                <div class="badge">الأنواع: ${it.subCount}</div>
+            </div>
+        `;
+        altgroup = it.name;
         btn.addEventListener('click', () => {
             set(LS.altCol, it.name);
             closeAltcolModal();
             openSubcolModal(mainGroupName, it.name);
         });
+
+        AltcolCount++;
         grid.appendChild(btn);
+
     });
+    if (AltcolCount === 1) {
+        set(LS.altCol, altgroup);
+        closeAltcolModal();
+        openSubcolModal(mainGroupName, altgroup);
+    }
 }
 
 /* ===== altSub modal ===== */
@@ -969,7 +1231,13 @@ function wireSubcolModalListeners() {
 function openSubcolModal(mainGroupName, altColName) {
     const { modal, title, hint } = getSubcolEls();
     if (!modal) return;
-    title.textContent = `المجموعة: ${mainGroupName} ← ${altColName}`;
+
+    if (altColName === mainGroupName || altColName.includes('مذكرة لسفارة')) {
+        title.textContent = `المجموعة: ${mainGroupName}`;
+    } else {
+        title.textContent = `المجموعة: ${mainGroupName} ← ${altColName}`;
+    }
+
     hint.textContent = 'اختر النوع الفرعي المطلوب';
     modal.hidden = false;
     loadAltSubs(mainGroupName, altColName);
@@ -1007,11 +1275,13 @@ async function loadAltSubs(mainGroupName, altColName) {
             <div class="icon-circle">📑</div>
             <div class="card-body">
                 <div class="card-title-sm">${it.name}</div>
-                <div class="card-title-sm">${it.id}</div>
+                
             </div>
         `;
+        // <div class="card-title-sm">${it.id}</div>
         btn.addEventListener('click', async () => {
             set(LS.altSub, it.name);
+            console.log('api_altsubs', it.id);
             set(LS.tpl, String(it.id));
 
             closeSubcolModal();
@@ -1023,6 +1293,35 @@ async function loadAltSubs(mainGroupName, altColName) {
 
             // Create draft now (so reload can jump to step 3)
             try { await ensureDraftCase(); } catch { }
+
+            // === NEW: update رقم/نوع المعاملة in DB ===
+            try {
+                const caseId = localStorage.getItem('caseId') || '';
+                const mainGroup = get(LS.main) || '';   // already stored when main group chosen
+                const altCol = get(LS.altCol) || '';
+                const altSub = get(LS.altSub) || '';
+
+                if (caseId && mainGroup && altCol && altSub) {
+                    const payload = { caseId, mainGroup, altCol, altSub };
+                    console.log(payload);
+                    const res = await fetch(apiUrl('./api_office_case_update_type.php'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok) {
+                        console.warn('[update_type] failed', res.status, data);
+                    } else {
+                        console.log('[update_type] success', data);
+                    }
+                } else {
+                    console.warn('[update_type] skipped, missing values', { caseId, mainGroup, altCol, altSub });
+                }
+            } catch (err) {
+                console.error('[update_type] error', err);
+            }
+            // === END NEW ===
 
             // after setting LS.altSub & LS.tpl and calling ensureDraftCase()
             const step3Btn = document.querySelector('.stepper-item[data-step="3"]');
@@ -1036,8 +1335,8 @@ async function loadAltSubs(mainGroupName, altColName) {
 
             // Show توضيح_المعاملة, and wait for user to click stepper or Next
             // (do not auto-showStep(3) here)
-
         });
+
         grid.appendChild(btn);
     });
 }
@@ -1090,7 +1389,11 @@ async function ensureDraftCase() {
     };
     console.log(payload);
     try {
-        const res = await fetch(apiUrl('./api_case_create.php'), {
+        let url = apiUrl('./api_case_create.php');
+        if (get('role') === 'employee')
+            url = apiUrl('./api_office_case_create.php');
+        console.log(url);
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1107,13 +1410,14 @@ async function ensureDraftCase() {
 
         const returnedId = String(data.caseId);
         const isInsert = data.mode === 'insert' || !existingCaseId || returnedId !== String(existingCaseId);
-
+        console.log(data);
         // Persist IDs
         localStorage.setItem(LS.caseId, returnedId);
         if (data.externalRef) localStorage.setItem(LS.extRef, data.externalRef);
 
         // Per-case UI/state reset ONLY on new case
         if (isInsert) {
+
             currentGalleryCaseId = returnedId;
             clearUploadsUI();
             localStorage.removeItem('apptDate');
@@ -1128,67 +1432,67 @@ async function ensureDraftCase() {
         return existingCaseId || null;
     }
 }
-
-// Ask the meta API for the template; cache id in LS.tpl
+// Robust resolver: handles 4xx/5xx, timeouts, soft-fail JSON, and busy UI.
 async function resolveModelIdFromAltPair(debug = false) {
     const altCol = get(LS.altCol) || '';
     const altSub = get(LS.altSub) || '';
+
     if (!altCol || !altSub) {
+        // No inputs → go back immediately
+        try { showStep(2); } catch { }
         return null;
     }
 
-    // Always encode! (URLSearchParams handles Arabic/space safely)
-    const qs = new URLSearchParams({ altCol, altSub });
-
-    const url = apiUrl(`api_case_model.php?${qs.toString()}`);
+    const url = apiUrl(`api_case_model.php?${new URLSearchParams({ altCol, altSub })}`);
 
     let res;
     try {
-        res = await fetch(url);
+        res = await fetch(url, { headers: { Accept: 'application/json' } });
     } catch (e) {
-        console.error('[resolveModelId] fetch error', e);
+        console.error('[resolveModelId] network error', e);
+        // Jump back now
+        // (defer by a tick so we don't collide with current UI work)
+        setTimeout(() => {
+            try {
+                __showStepBusy = false;
+                showStep(2);
+            } catch { }
+        }, 0);
         return null;
     }
 
+    if (!res.ok) {
+        
+        setTimeout(() => { try { showStep(2); } catch { } }, 0);
+        return null;
+    }
 
-    // Read raw text first for easier debugging, then parse JSON
-    const raw = await res.text();
-
-    let j = null;
+    let j;
     try {
-        j = JSON.parse(raw);
+        j = await res.json(); // your API returns manageable { ok, found, id } or { id }
     } catch (e) {
         console.error('[resolveModelId] JSON parse error', e);
+        setTimeout(() => { try { showStep(2); } catch { } }, 0);
         return null;
     }
 
-    const id = (j && j.id != null) ? Number(j.id) : 0;
-    if (id > 0) set(LS.tpl, String(id));
-    else console.warn('[resolveModelId] no id returned', j);
+    const id = Number(j?.id ?? 0);
+    const found = typeof j?.found === 'boolean' ? j.found : id > 0;
 
-    return id > 0 ? id : null;
+    if (!found || id <= 0) {
+        console.warn('[resolveModelId] no id returned', j);
+        __showStepBusy = false;
+        showStep(2);
+        return null;
+    }
+
+    set(LS.tpl, String(id));
+    return id;
 }
-
 
 
 /* ===== STEP 3 (requirements list for uploads) ===== */
-async function loadRequirements() {
-    const step3 = $('#step3');
-    if (!step3 || step3.hidden) return [];
 
-    let modelId = get(LS.tpl);
-    if (!modelId) {
-        modelId = await resolveModelIdFromAltPair(false);   // ← await here
-    }
-    if (!modelId) { renderRequirements([]); return []; }
-
-    const res = await fetch(apiUrl('./api_requirements.php?modelId=' + encodeURIComponent(modelId)));
-    if (!res.ok) { renderRequirements([]); return []; }
-    const data = await res.json();
-    const items = Array.isArray(data.items) ? data.items : [];
-    renderRequirements(items);
-    return items;
-}
 
 
 function updateNextStep3Button(enabled = true) {
@@ -1206,9 +1510,79 @@ function setUploadsDoneFrom(requiredStatus) {
     localStorage.setItem(LS.uploadsDone, allOk ? '1' : '0'); // FIX
 }
 
+function syncUploadedRequirements(uploadedItems = []) {
+    if (!Array.isArray(uploadedItems)) return;
 
+    const rows = document.querySelectorAll('.req-row');
+    console.log('syncUploadedRequirements → found rows:', rows.length);
 
-function renderRequirements(items) {
+    const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+    const uploadedLabels = new Set(uploadedItems.map(it => norm(it.Label || '')));
+    console.log('uploadedLabels:', uploadedLabels);
+
+    rows.forEach(row => {
+        const labelEl = row.querySelector('.req-label');
+        const statusEl = row.querySelector('.req-status');
+        if (!labelEl || !statusEl) {
+            console.log('row missing label/status', row);
+            return;
+        }
+
+        const label = norm(labelEl.textContent);
+        if (uploadedLabels.has(label)) {
+            statusEl.textContent = '✓ تم التحميل';
+            statusEl.classList.add('ok');
+            requiredStatus[label] = true;
+            console.log('✅ matched:', label);
+        } else {
+            statusEl.textContent = 'غير محمل';
+            statusEl.classList.remove('ok');
+            requiredStatus[label] = false;
+            console.log('❌ not matched:', label);
+        }
+    });
+
+    if (typeof updateNextStep3Button === 'function') {
+        updateNextStep3Button();
+    }
+}
+
+async function loadRequirements() {
+    const step3 = $('#step3');
+    if (!step3 || step3.hidden) return [];
+
+    let modelId = get(LS.tpl);
+    modelId = await resolveModelIdFromAltPair(false);
+    if (!modelId) { renderRequirements([], []); return []; }
+
+    // 1. load requirements
+    const res = await fetch(apiUrl('./api_requirements.php?modelId=' + encodeURIComponent(modelId)));
+    if (!res.ok) { renderRequirements([], []); return []; }
+    const data = await res.json();
+    const requiredItems = Array.isArray(data.items) ? data.items : [];
+
+    // 2. load already uploaded files for this case
+    const caseId = localStorage.getItem('caseId');
+    let uploadedItems = [];
+    if (caseId) {
+        let url = apiUrl('./api_casefile_list.php?caseId=' + encodeURIComponent(caseId));
+        if (get('role') === 'employee') {
+            url = apiUrl('./api_office_casefile_list.php?caseId=' + encodeURIComponent(caseId));
+        }
+        const resUp = await fetch(url);
+        if (resUp.ok) {
+            const dataUp = await resUp.json();
+            if (dataUp?.ok && Array.isArray(dataUp.items)) uploadedItems = dataUp.items;
+        }
+    }
+
+    // 3. render both together
+    renderRequirements(requiredItems, uploadedItems);
+
+    return requiredItems;
+}
+
+function renderRequirements(requiredItems, uploadedItems = []) {
     const list = document.getElementById('reqList');
     const empty = document.getElementById('reqEmpty');
     if (!list || !empty) return;
@@ -1216,44 +1590,38 @@ function renderRequirements(items) {
     list.innerHTML = '';
     requiredStatus = {};
 
-
-
-    // global (once)
-    window.reqStatusMap = window.reqStatusMap || new Map();
     const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+    const uploadedSet = new Set(uploadedItems.map(it => norm(it.Label || '')));
 
+    requiredItems
+        .filter(l => !norm(l).includes('أخرى'))
+        .forEach((rawLabel, idx) => {
+            const label = norm(rawLabel);
+            const alreadyUploaded = uploadedSet.has(label);
+            requiredStatus[label] = alreadyUploaded;
 
-    // Skip any label that contains "أخرى"
-    const filteredItems = (items || []).filter(l => !norm(l).includes('أخرى'));
+            const row = document.createElement('div');
+            row.className = 'req-row';
+            const inputId = `req-file-${idx}`;
 
-    filteredItems.forEach((rawLabel, idx) => {
-        const label = norm(rawLabel);
+            row.innerHTML = `
+                <span class="req-num">${idx + 1}.</span>
+                <span class="req-label">${label}</span>
+                <label for="${inputId}" class="upload-btn">📂 اختر ملف</label>
+                <input id="${inputId}" class="req-file" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+                <span class="req-status ${alreadyUploaded ? 'ok' : ''}" id="${inputId}-status">
+                  ${alreadyUploaded ? '✓ تم التحميل' : 'غير محمل'}
+                </span>
+            `;
 
-        // mark as required (initially not uploaded)
-        requiredStatus[label] = false;
+            row.querySelector('input').addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                handleRequiredUpload(label, file, `${inputId}-status`);
+            });
 
-        const row = document.createElement('div');
-        row.className = 'req-row';
-        const inputId = `req-file-${idx}`;
-
-        row.innerHTML = `
-    <span class="req-num">${idx + 1}.</span>
-    <span class="req-label">${label}</span>
-    <label for="${inputId}" class="upload-btn">📂 اختر ملف</label>
-    <input id="${inputId}" class="req-file" type="file" accept=".pdf,.jpg,.jpeg,.png" />
-    <span class="req-status" id="${inputId}-status">غير محمل</span>
-  `;
-
-        row.querySelector('input').addEventListener('change', (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            handleRequiredUpload(label, file, `${inputId}-status`);
+            list.appendChild(row);
         });
-
-        list.appendChild(row);
-    });
-
-
 
     updateNextStep3Button();
 }
@@ -1289,6 +1657,7 @@ async function handleRequiredUpload(label, file, statusId) {
 
         if (res.ok && data?.success) {
             if (statusEl) {
+                console.log('statusEl');
                 statusEl.textContent = '✓ تم التحميل';
                 statusEl.classList.remove('err');
                 statusEl.classList.add('ok');
@@ -1443,6 +1812,7 @@ $('#step0')?.addEventListener('click', () => {
     // showStep(0);
     let role = localStorage.getItem('role')
     if (role === 'employee') {
+
         if (typeof loadOfficeList === 'function') loadOfficeList({});
     } else {
         if (typeof loadCases === 'function') loadCases({});
@@ -1451,8 +1821,13 @@ $('#step0')?.addEventListener('click', () => {
 
 function initStep3() {
     // Rebuild required list for current template
-    console.log('requirments');
-    loadRequirements(); // your existing fetch + renderRequirements(items)
+    loadRequirements();
+
+    refreshUploadsList('nextBtnStep3');
+    setTimeout(() => {
+        syncUploadedRequirements(window.uploadedItems);
+    }, 50);
+
     // Reset extra area on entry
     const extraHost = document.getElementById('extraList');
     if (extraHost) extraHost.innerHTML = '';
@@ -1485,6 +1860,53 @@ function validateRequiredUploads() {
     }
     return true;
 }
+
+document.querySelectorAll('input[name="docLang"]').forEach(radio => {
+    radio.addEventListener('change', async (e) => {
+        const lang = e.target.value;
+        console.log("Language chosen:", lang);
+
+        // 🔹 Update page direction + localStorage
+        if (lang === 'ar') {
+            document.body.setAttribute('dir', 'rtl');
+            localStorage.setItem('docLang', 'ar');
+        } else if (lang === 'en') {
+            document.body.setAttribute('dir', 'ltr');
+            localStorage.setItem('docLang', 'en');
+        }
+
+        // 🔹 Send to backend immediately
+        const caseId = get(LS.caseId);       // ensure caseId is saved in localStorage earlier
+        const mainGroup = get(LS.main) || 'توكيل';
+        let lang_tosave = 'العربية'
+        if (lang === 'en')
+            lang_tosave = 'الانجليزية';
+        if (caseId) {
+            try {
+                const res = await fetch('/api_update_lang.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        caseId: Number(caseId),
+                        mainGroup: mainGroup,
+                        lang: lang_tosave
+                    })
+                });
+                const j = await res.json();
+                if (j.ok) {
+                    console.log("✅ Language updated in table:", j);
+                } else {
+                    console.warn("⚠️ Failed to update language:", j);
+                }
+            } catch (err) {
+                console.error("❌ Network error updating language:", err);
+            }
+        } else {
+            console.warn("⚠️ No caseId found in localStorage; cannot update language.");
+        }
+    });
+});
+
 
 /* ===== Boot ===== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1531,7 +1953,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showStep(toShow);
 
 
-    refreshUploadsList();
+
     // Next from Step 3 (future: to personal data)
     const nextBtn = document.getElementById('nextBtnStep3') || document.querySelector('#nextBtnStep3');
     if (nextBtn) {
@@ -1674,13 +2096,15 @@ function renderUploadsGallery(items) {
     // Mark uploaded statuses by label and render cards
     (items || []).forEach(it => {
         const key = norm(it.Label || '');
-
-        // Mark required status as uploaded
         const stEl = statusMap.get(key);
         if (stEl) {
             stEl.textContent = '✓ تم التحميل';
             stEl.classList.add('ok'); // optional CSS hook
+            if (typeof requiredStatus === 'object') {
+                requiredStatus[key] = true;
+            }
         }
+
         if (typeof requiredStatus === 'object' && key) {
             requiredStatus[key] = true;
         }
@@ -1807,6 +2231,7 @@ function renderUploadsGallery(items) {
 
     // Re-evaluate “Next” button state
     if (typeof updateNextStep3Button === 'function') updateNextStep3Button();
+    return items;
 }
 
 async function refreshUploadsList() {
@@ -1827,6 +2252,8 @@ async function refreshUploadsList() {
     const data = await res.json();
     if (data?.ok && Array.isArray(data.items)) {
         renderUploadsGallery(data.items);
+        window.uploadedItems = data.items;
+
     }
 }
 
@@ -1915,6 +2342,7 @@ const langIsArabic = () => (localStorage.getItem('docLang') || 'ar').toLowerCase
 
 // Input constraints per language
 function sanitizeName(s) {
+    console.log(langIsArabic());
     const v = String(s || '').trim();
     if (langIsArabic()) return v.replace(/[A-Za-z]/g, '');
     return v.replace(/[\u0600-\u06FF]/g, ''); // strip Arabic for English docs
@@ -1955,8 +2383,9 @@ function validatePersonDetailed(section, p, requirements) {
 
     const isPassport = typeNorm === 'جواز سفر';
     const isNationalId = typeNorm === 'رقم وطني';
-    console.log('LS.lang:', get('docLang'));
+
     // ---------- Name (all sections) ----------
+    console.log(p);
     if (!p.name?.trim()) {
         errors.pf_name = 'الاسم مطلوب.';
         list.push('الاسم مطلوب.');
@@ -2026,6 +2455,21 @@ function validatePersonDetailed(section, p, requirements) {
             errors.pf_id_number = 'رقم الهوية مطلوب.';
             list.push('رقم الهوية مطلوب.');
         }
+        if (!id.issuer) {
+            errors.pf_id_type = 'مكان الإصدار مطلوب.';
+            list.push('مكان الإصدار مطلوب.');
+        } else {
+            // language constraint
+            if (arabicDocLang() && /[A-Za-z]/.test(id.issuer)) {
+                errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف العربية.';
+                list.push('مكان الإصدار يجب أن يكون بالحروف العربية.');
+            }
+            if (!arabicDocLang() && /[\u0600-\u06FF]/.test(id.issuer)) {
+                errors.pf_id_issuer = 'مكان الإصدار يجب أن يكون بالحروف الانجليزية.';
+                list.push('مكان الإصدار يجب أن يكون بالحروف الانجليزية.');
+            }
+        }
+
     }
 
     // ---------- ID format ----------
@@ -2223,6 +2667,78 @@ function updateNextBtnStep4() {
     // console.debug('[Step4] gate:', res);
 }
 
+// Render to BOTH views: table (desktop) and cards (mobile).
+function renderCases(rows = []) {
+    // Desktop
+    const tb = document.querySelector('#casesTable tbody');
+    const emptyDesktop = document.getElementById('casesEmpty');
+    if (tb) tb.innerHTML = rows.map(r => `
+    <tr data-id="${r.id}">
+      <td>${r.id ?? ''}</td>
+      <td>${r.group ?? ''}</td>
+      <td>${r.type ?? ''}</td>
+      <td>${r.date ?? ''}</td>
+    </tr>
+  `).join('');
+
+    const hasRows = rows.length > 0;
+    if (emptyDesktop) emptyDesktop.hidden = hasRows;
+
+    // Mobile cards
+    const cardsHost = document.getElementById('casesCards');
+    const emptyMobile = document.getElementById('casesEmptyMobile');
+    if (cardsHost) {
+        cardsHost.hidden = !hasRows;
+        cardsHost.innerHTML = rows.map(r => `
+      <article class="case-card" data-id="${r.id}" dir="rtl">
+        <header>
+          <div>قضية #${r.id ?? ''}</div>
+          <time datetime="${r.date ?? ''}">${r.date ?? ''}</time>
+        </header>
+        <div class="case-meta">
+          <div><strong>المجموعة:</strong> ${r.group ?? '-'}</div>
+          <div><strong>النوع:</strong> ${r.type ?? '-'}</div>
+        </div>
+        <div class="case-actions">
+          <button class="btn btn-ghost" data-action="open">فتح</button>
+          <button class="btn" data-action="continue">متابعة</button>
+        </div>
+      </article>
+    `).join('');
+    }
+    if (emptyMobile) emptyMobile.hidden = hasRows;
+
+    // Click handlers for mobile cards (open/continue)
+    cardsHost?.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const card = btn.closest('.case-card');
+        const id = card?.getAttribute('data-id');
+        if (!id) return;
+        if (btn.dataset.action === 'open') {
+            // your open handler:
+            openCase?.(id);
+        } else if (btn.dataset.action === 'continue') {
+            // your continue flow:
+            openCase?.(id);
+            showStep?.(1);
+        }
+    }, { once: true }); // remove if you re-render frequently
+}
+
+// Example: mapping your existing row shape to {id, group, type, date}
+function mapRow(r) {
+    return {
+        id: r.CaseID ?? r.id,
+        group: r.mainGroup ?? r.group ?? r['المجموعة'],
+        type: r.altSubColName ?? r.type ?? r['النوع'],
+        date: r.CreatedAt?.slice(0, 10) ?? r.date
+    };
+}
+
+// After fetching:
+/// const rows = data.rows.map(mapRow); renderCases(rows);
+
 
 // ===== Render cards =====
 function personCard(p, idx, section) {
@@ -2359,6 +2875,7 @@ function configurePartyModalFor(section) {
 
 
 function renderPartyLists() {
+
     const req = partyState?.requirements || {};
 
     // Show/Hide sections
@@ -2494,7 +3011,7 @@ $g('partyModalSave')?.addEventListener('click', async (e) => {
 
     const person = {
         role: section === 'applicants' ? 'primary' : undefined,
-        name: sanitizeName($g('pf_name').value),
+        name: $g('pf_name').value,
         sex: getRadioVal('pf_sex'),
         job: $g('pf_job').value.trim() || undefined,
         nationality: nationalityVal || undefined,
@@ -2513,7 +3030,7 @@ $g('partyModalSave')?.addEventListener('click', async (e) => {
     if (person.ids[0].type === 'national_id' || person.ids[0].type === 'رقم وطني') {
         person.ids[0].issuer = undefined; // not needed
     }
-
+    console.log(person.name);
     // validate (this version already defaults auth nationality when empty)
     const v = validatePersonDetailed(section, person, partyState.requirements);
     if (!v.ok) {
@@ -2532,15 +3049,16 @@ $g('partyModalSave')?.addEventListener('click', async (e) => {
         alert('تحقق من البيانات:\n- ' + dup.messages.join('\n- '));
         return;
     }
-
-    let ok = await upsertParty(section, index, person);
+    let main = get(LS.main);
+    let ok = await upsertParty(main, section, index, person);
     if (!ok) {
         alert('تعذر الحفظ'); return;
     }
 
     closePartyModal();
-    await loadPartyState();
-    renderPartyLists();
+    initStep4();
+
+
 });
 
 
@@ -2576,19 +3094,49 @@ async function loadPartyState() {
     };
 }
 
-async function upsertParty(section, index, person) {
-    console.log(section, index, person);
+async function upsertParty(mainGroup, section, index, person) {
+    const caseId = caseIdLS();
+    console.log('[upsertParty] request', { mainGroup, section, index, person, caseId });
+    if (!caseId) return false;
+
+    // choose endpoint
     let url = 'api_case_party_upsert.php';
-    if (get('role') === 'employee')
-        url = 'api_office_party_upsert.php';
-    const caseId = caseIdLS(); if (!caseId) return false;
-    const body = { caseId, section, index, person };
-    const res = await fetch(apiUrl('./' + url), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
-    const data = await res.json().catch(() => ({}));
-    return !!data?.ok;
+    if (get('role') === 'employee') url = 'api_office_party_upsert.php';
+
+    const payload = { caseId, section, index, person, mainGroup };
+
+    try {
+        const res = await fetch(apiUrl('./' + url), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        let data = null;
+        try {
+            data = await res.json();
+        } catch (e) {
+            const raw = await res.text().catch(() => '');
+            console.warn('[upsertParty] non-JSON response', res.status, raw);
+            return false;
+        }
+
+        if (!res.ok || !data?.ok) {
+            console.warn('[upsertParty] server returned error', {
+                status: res.status,
+                data,
+                url,
+                payload,
+            });
+            return false;
+        }
+
+        console.log('[upsertParty] success', data);
+        return true;
+    } catch (e) {
+        console.error('[upsertParty] fetch error:', e, { url, payload });
+        return false;
+    }
 }
 
 async function deleteParty(section, index) {
@@ -2616,9 +3164,12 @@ async function initStep4() {
     document.querySelector('.stepper-item[data-step="4"]')?.removeAttribute('disabled');
     if (get('role') === 'employee') {
         const officeId = get(LS.caseId);
-        const state = await openOfficeCase(officeId, false);  // ← await!
+        const main = get(LS.main);
+        const state = await openOfficeCase(officeId, main, false);  // ← await!
 
-        const main = state?.selected?.mainGroup || get(LS.main) || '';
+
+
+
         const flags =
             main === 'توكيل'
                 ? { needAuthenticated: true, needWitnesses: true, needWitnessesOptional: false }
@@ -2636,7 +3187,7 @@ async function initStep4() {
             requirements: flags
         };
 
-        console.log('partyState', partyState);
+
         // return;
     } else {
         await loadPartyState();
@@ -2705,10 +3256,18 @@ async function saveCaseDetailsPatch(patch) {
 
     if (!caseId) return;
     if (get('role') === 'employee') {
+        const payload = {
+            caseId,
+            fields: patch,
+            mainGroup: get(LS.main) || 'توكيل'  // send mainGroup explicitly
+        }
+        console.log(payload);
         await fetch(apiUrl('api_office_details_upsert.php'), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caseId, fields: patch })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
+
     } else {
         await fetch(apiUrl('api_case_details_upsert.php'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2724,6 +3283,7 @@ function renderStep5Form(model, answers) {
     host.innerHTML = '';
 
     const fields = Array.isArray(model.fields) ? model.fields : [];
+
 
     fields.forEach(raw => {
         const key = String(raw.key || '').trim();
@@ -2753,6 +3313,11 @@ function renderStep5Form(model, answers) {
     });
 
     updateNextBtnStep5(true);
+    step5Fields = fields.length;
+    if (step5Fields === 0)
+        document.getElementById('fieldsNames').style.display = 'none';
+    else
+        document.getElementById('fieldsNames').style.display = 'flex';
 }
 
 function renderStep5Field(desc, value) {
@@ -2817,21 +3382,55 @@ function renderStep5Field(desc, value) {
     else if (desc.type === 'select') {
         const sel = document.createElement('select');
         sel.id = id;
+
         const blank = document.createElement('option');
-        blank.value = ''; blank.textContent = '—';
+        blank.value = '';
+        blank.textContent = '—';
         sel.appendChild(blank);
-        (desc.options || []).forEach(opt => {
+
+        // 🔹 Special handling for "الدولة"
+        let options = desc.options || [];
+        if ((desc.label && desc.label.includes('الدولة')) || (desc.key && desc.key.includes('الدولة'))) {
+            const lang = localStorage.getItem('docLang') || 'ar';
+            let options = [];
+
+            if (lang === 'ar' || lang === 'العربية') {
+                options = window.comboData?.arabCountries || [];
+            } else {
+                options = window.comboData?.foreignCountries || [];
+            }
+
+            options.forEach(label => {
+                if (!label) return; // skip null/empty
+
+                const o = document.createElement('option');
+                o.value = label;
+                o.textContent = label;
+                if (value === label) o.selected = true;
+
+                sel.appendChild(o);
+            });
+
+        }
+
+
+        options.forEach(opt => {
             const o = document.createElement('option');
-            o.value = opt; o.textContent = opt;
+            o.value = opt;
+            o.textContent = opt;
             if (value === opt) o.selected = true;
             sel.appendChild(o);
         });
+
         sel.addEventListener('change', () => {
-            const patch = {}; patch[desc.key] = sel.value || null;
+            const patch = {};
+            patch[desc.key] = sel.value || null;
             saveAnswersDebounced(patch);
         });
+
         control = sel;
     }
+
     else {
         // fallback
         control = document.createElement('input');
@@ -2908,16 +3507,19 @@ function pickDynamicAnswers(row) {
 
 async function initStep5() {
     const caseId = Number(localStorage.getItem('caseId') || 0);
+
     if (!caseId) {
         alert('لا يوجد رقم معاملة. الرجاء اختيار النوع أولاً.');
-        showStep(2);
+        // showStep(2);
         return;
     }
     let meta = [];
     document.querySelector('.stepper-item[data-step="4"]')?.removeAttribute('disabled');
     if (get('role') === 'employee') {
         const officeId = get(LS.caseId);
-        const state = await openOfficeCase(officeId, false);  // ← await!
+        const mainGroup = get(LS.main);
+
+        const state = await openOfficeCase(officeId, mainGroup, false);  // ← await!
 
 
         // ✅ correct usage
@@ -2944,7 +3546,7 @@ async function initStep5() {
         updateNextBtnStep5(false, 'تعذر تحميل نموذج التفاصيل.');
         return;
     }
-    console.log('answers: ', meta.answers);
+
 
     renderStep5Form(meta.model, meta.answers || {});
     updateNextBtnStep5(true, '');
@@ -2962,6 +3564,7 @@ async function initStep5() {
         next2.addEventListener('click', (e) => { e.preventDefault(); showStep(6); });
     }
     document.querySelector('.stepper-item[data-step="6"]')?.removeAttribute('disabled');
+
 }
 
 
@@ -2998,6 +3601,7 @@ async function fetchDetails(caseId) {
 
 async function fetchCaseFiles(caseId) {
     // If you already have api_casefile_list.php, use it:
+    console.log('fetchCaseFiles');
     let url = apiUrl(`api_casefile_list.php?caseId=${encodeURIComponent(caseId)}`);
     if (get('role') === 'employee') {
         url = apiUrl(`api_office_casefile_list.php?caseId=${encodeURIComponent(caseId)}`);
@@ -3126,8 +3730,9 @@ function formatWitnessRow(p) {
 }
 
 // ---------- Step 6 initializer ----------
-async function initStep6() {
+async function initStep7() {
     console.log('→ initStep6');
+
     document.querySelector('.stepper-item[data-step="6"]')?.removeAttribute('disabled');
 
     const caseId = Number(localStorage.getItem('caseId') || 0);
@@ -3241,9 +3846,9 @@ async function initStep6() {
 
     // --- Buttons ---
     document.getElementById('btnPrint')?.addEventListener('click', () => window.print());
-    document.getElementById('nextBtnStep6')?.addEventListener('click', (e) => {
+    document.getElementById('nextBtnStep7')?.addEventListener('click', (e) => {
         e.preventDefault();
-        showStep(7); // TODO: hook promote/submit API here
+        submitCase();
     });
 }
 
@@ -3265,7 +3870,7 @@ function addDaysISO(days) {
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
 }
-function validDateWithin7(dateStr) {
+function validDateWithin6(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr + 'T00:00:00');
     const min = new Date(todayISO() + 'T00:00:00');
@@ -3274,19 +3879,19 @@ function validDateWithin7(dateStr) {
 }
 function validTimeStr(t) { return /^\d{2}:\d{2}$/.test(t || ''); }
 
-function validateStep7() {
+function validateStep6() {
     const ack = document.getElementById('ackTerms').checked;
     const dateStr = document.getElementById('apptDate').value;
     const timeStr = document.getElementById('apptTime').value;
 
-    const dateOk = validDateWithin7(dateStr);
+    const dateOk = validDateWithin6(dateStr);
     const timeOk = validTimeStr(timeStr);
 
     document.getElementById('ackError').hidden = ack;
     document.getElementById('apptError').hidden = (dateOk && timeOk);
 
     const ok = ack && dateOk && timeOk;
-    document.getElementById('submitBtnStep7').disabled = !ok;
+    document.getElementById('submitBtnStep6').disabled = !ok;
     return ok;
 }
 
@@ -3316,14 +3921,14 @@ function renderHours(hours, selectedHour) {
                 document.querySelectorAll('.hour-btn.is-selected').forEach(el => el.classList.remove('is-selected'));
                 btn.classList.add('is-selected');
                 localStorage.setItem('apptHour', h.time);
-                validateStep7();
+                validateStep6();
             });
         }
         grid.appendChild(btn);
     });
 }
 
-function validateStep7() {
+function validateStep6() {
     const dateEl = document.getElementById('apptDate');
     const ack = document.getElementById('ackTerms');
     const submit = document.getElementById('submitBtn');
@@ -3351,10 +3956,10 @@ async function onDateChange() {
     if (!date) { renderHours([], null); validateStep7(); return; }
     const hours = await fetchHourAvailability(date);
     renderHours(hours, null);
-    validateStep7();
+    validateStep6();
 }
 
-function initStep7() {
+function initStep6() {
     const dateEl = document.getElementById('apptDate');
     const submit = document.getElementById('submitBtn');
     const ack = document.getElementById('ackTerms');
@@ -3372,28 +3977,25 @@ function initStep7() {
         dateEl.value = savedDate;
         fetchHourAvailability(savedDate).then(hours => {
             renderHours(hours, savedHour);
-            validateStep7();
+            validateStep6();
         });
     } else {
         renderHours([], null);
     }
 
     dateEl.addEventListener('change', onDateChange);
-    ack.addEventListener('change', validateStep7);
+    ack.addEventListener('change', validateStep6);
 
     submit.addEventListener('click', (e) => {
-        validateStep7();
+        validateStep6();
         if (submit.disabled) {
             e.preventDefault();
             return;
         }
-        // At this point you can:
-        // 1) Save into the case via API (recommended next step):
-        //    POST ./api_case_set_appt.php { caseId, date, hour }
-        // 2) Then proceed to final submit/next step.
+
     });
 
-    validateStep7();
+    validateStep6();
     submit.addEventListener('click', async (e) => {
         e.preventDefault();
         // ensure still valid (date, hour, terms)
@@ -3401,7 +4003,7 @@ function initStep7() {
         const dateOk = !!document.getElementById('apptDate').value;
         const hourOk = !!localStorage.getItem('apptHour');
         if (!dateOk || !hourOk || !ack.checked) return;
-        await submitCase();
+        showStep(7);
     });
 }
 
@@ -3513,110 +4115,3 @@ function resetAfterSubmit() {
     // If your Step 1 needs initialization code, call it here:
     // if (typeof initStep1 === 'function') initStep1();
 }
-// Here’s the high-level map of the flow—**what each step does** and **how we control it**. No code walls, just the moving parts you’ll touch.
-
-// # Steps (0 → 7)
-
-// **Step 0 — القائمة (List / Landing)**
-
-// * **Customer role:** lists online cases from `online.Cases` via `api_cases_list.php`.
-// * **Employee role:** lists office cases (UNION of `dbo.TableAuth` + `dbo.TableCollection`) via `api_office_cases_list.php`.
-// * **Open case:** calls `openOfficeCase()` → `allowLeaveStep0('open-case')` → `requestReloadToStep(1,'open-case')`.
-// * **Control:** `showStep(0)` triggers `initStep0()` which loads the appropriate list. A guard (`step0ExitReason`) prevents accidental jump away from Step 0 unless we set it explicitly.
-
-// **Step 1 — اللغة (Language)**
-
-// * Pick: **العربية** or **الانجليزية** (UI stays Arabic/RTL; validation mode changes).
-// * **Validation rules toggle:**
-
-//   * Arabic doc ⇒ allow Arabic letters (and digits/punctuation), block Arabic-shaping mistakes.
-//   * English doc ⇒ block Arabic codepoints in free-text fields.
-// * **Control:** store selected language in `LS.lang`. `showStep(1)` enables step 2 pill.
-
-// **Step 2 — نوع الطلب (Application Type)**
-
-// * Show 5 **main group** cards (fixed):
-
-//   1. إفادة لمن يهمه الأمر  2) إقرار  3) إقرار مشفوع باليمين  4) توكيل  5) مخاطبة لتأشيرة دخول
-// * Clicking a main group opens a centered panel of **sub-group cards** (from DB). Selecting one sets:
-
-//   * `LS.altColName` (altCol), `LS.altSubColName` (altSub), and language label.
-// * **Control:** selection enables **Step 3**. We also cache choice for reload resume (`LS.saved`).
-
-// **Step 3 — المستندات الداعمة (Supporting Docs)**
-
-// * Shows a short **info blurb** about the selected doc type (from the model).
-// * Upload required docs (images/PDF up to **3 MB**), associate them with current case.
-// * **Requirements:** load with `loadRequirements()` using `modelId`. If missing, we **resolve it** first:
-
-//   * `resolveModelIdFromAltPair()` → calls `api_case_details_meta.php?altCol=...&altSub=...` → saves `LS.tpl` (modelId).
-// * **Control:** Next is enabled only when mandatory uploads satisfied.
-
-// **Step 4 — البيانات الشخصية (People)**
-
-// * **Applicants** (1..n), **Authenticated persons** (0..n, only if required by model), **Witnesses** (often 2).
-// * Each person: name, sex, job, nationality, DoB, IDs (type/number/issuer/expiry).
-// * **ID rules:**
-
-//   * Sudan **passport**: `P|B` + exactly **8 digits**.
-//   * Sudan **national ID**: exactly **11 digits**.
-//   * Applicants: if the model requires authenticating/witnessed flow, **foreign IDs not accepted** for the applicant.
-//   * Authenticated person: if **not Sudanese**, nationality **required**.
-// * **Language gate:** enforce Arabic-only or English-only input set by Step 1.
-// * **Control:** data persisted in `PartyJson`-like local state; `canProceedStep4()` gates Next.
-
-// **Step 5 — تفاصيل الطلب (Dynamic Form)**
-
-// * Built from `dbo.TableAddModel` using `altCol/altSub` via `api_case_details_meta.php`:
-
-//   * `itextN` → text (width from `itextNLength`)
-//   * `icheckN` → **radio** (options from `icheckNOption`; default نعم/لا)
-//   * `icomboN` → radio if ≤3 options, else select (options from `icomboNOption`)
-//   * `itxtDateN` → date
-//   * `ibtnAdd1` → button
-//   * `Lang` column toggles RTL if needed (UI is Arabic anyway; we still honor length/dir hints).
-// * **Employee-only (hidden)**: a live **TextModel preview** that updates as fields change, and is **editable** by the employee (free-text override).
-// * **Control:** answers stored in `DetailsJson.answers.fields`; Next requires required fields valid.
-
-// **Step 6 — المراجعة (Review)**
-
-// * One consolidated page: document type, uploads, people, and form answers.
-// * In **employee view**, this is where they can still edit the free-text paragraph before PDF.
-// * **Control:** “تحرير” buttons jump back to individual steps; “التالي” finalizes payload.
-
-// **Step 7 — الإرسال (Submit / Generate)**
-
-// * **Customer:** submit online case (update `Status`, `SubmittedAt`) and confirmation.
-// * **Employee:** generate **PDF** (mPDF/TCPDF supported styling: bold, sizes, alignment, underline), assign office number (`ق س ج/80/YY/MGID/Seq`), archive status, and print if needed.
-// * **Control:** final server calls; on success, mark archived / scheduled and show receipt.
-
-// # Cross-cutting control & persistence
-
-// * **Navigation**
-
-//   * `showStep(n, {force})`: the **only** place that changes the current step; saves `LS.saved = n`, updates stepper pills, initializes step on first entry.
-//   * **Guard**: can’t leave Step 0 unless `step0ExitReason` is set (we set it in explicit actions like “Open case”).
-//   * **One-shot reload**: `requestReloadToStep(n, reason)` stores a pending nav in `sessionStorage` and reloads; boot code reads it, clears it, and calls `showStep(n, {force:true})`—avoids reload loops.
-
-// * **Role (Customer vs Employee)**
-
-//   * Toggle UI: checkbox “وضع الموظف (للاختبار)”.
-//   * **Customer** lists online cases; **Employee** lists office tables; opening an online CaseID in office mode triggers **import/bridge** flow to office tables.
-
-// * **Local storage keys (examples)**
-
-//   * `LS.lang` — selected language label.
-//   * `LS.saved` — last step number for resume after reload.
-//   * `LS.altColName`, `LS.altSubColName` — chosen doc type.
-//   * `LS.tpl` — resolved `modelId` (template ID) for requirements and Step 5.
-//   * (Party/answers are kept in JS state and/or saved via APIs as you advance.)
-
-// * **APIs**
-
-//   * `api_cases_list.php` — online list for customer cards/table (config-driven columns).
-//   * `api_office_cases_list.php` — UNION of `TableAuth` + `TableCollection` with status coloring.
-//   * `api_case_details_meta.php?altCol&altSub[&caseId]` — returns model (fields) and optional saved answers.
-//   * `api_requirements.php?modelId` — returns required uploads list per model.
-//   * Uploads endpoints — store files tied to the case row; enforce type/size.
-
-// That’s the whole choreography: **Steps define the user journey**, and **`showStep` + LS/sessionStorage** are the traffic lights that keep reloads, roles, and resumes sane.
