@@ -117,9 +117,22 @@ try {
         return $st->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    $rowsColl = fetchData($pdo, "TableCollection", $periodExpr, "نوع_المعاملة", $where, $params);
-    $rowsAuth = fetchData($pdo, "TableAuth", $periodExpr, "نوع_التوكيل", $where, $params);
+    $sqlAuthAgg = "
+        SELECT 
+            $periodExpr AS Period,
+            N'توكيل' AS CaseType,
+            COUNT(*) AS Cnt
+        FROM TableAuth
+        WHERE $where
+        GROUP BY $periodExpr
+        ORDER BY $periodExpr
+    ";
+    $st = $pdo->prepare($sqlAuthAgg);
+    $st->execute($params);
+    $rowsAuth = $st->fetchAll(PDO::FETCH_ASSOC);
 
+    $rowsColl = fetchData($pdo, "TableCollection", $periodExpr, "نوع_المعاملة", $where, $params);
+    
     // merge
     $merged = [];
     foreach ([$rowsColl, $rowsAuth] as $rows) {

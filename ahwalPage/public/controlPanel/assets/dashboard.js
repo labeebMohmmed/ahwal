@@ -1334,6 +1334,7 @@ function reportsControl(container) {
     async function loadAvailableFilters(type) {
         const res = await fetch(`report_options.php?type=${type}`);
         const data = await res.json();
+        
         renderFilters(type, data);
     }
 
@@ -1358,6 +1359,7 @@ function reportsControl(container) {
         const res = await fetch(query);
         const data = await res.json();
         currentReportData = data;
+        console.log(data);
         renderReportTable(document.getElementById("reportTableWrapper"), type, data);
     }
 
