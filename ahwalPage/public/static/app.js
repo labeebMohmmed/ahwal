@@ -148,12 +148,6 @@ const CasesUI = {
 
 
 async function loadOfficeList(params = {}) {
-    document.getElementById('step10').style.display = 'block';
-    document.getElementById('step0').style.display = 'none';
-    document.getElementById('roleToggle_row').hidden = false;
-
-    const userId = Number(localStorage.getItem('userId') || 2); // استبدلها بالجلسة لاحقًا
-
     const qs = new URLSearchParams(params).toString();
     // console.log(qs);
     const res = await fetch('api_office_cases_list.php?' + qs);
@@ -212,23 +206,54 @@ async function loadOfficeList(params = {}) {
 
 
 
+    const fromInput = document.getElementById("from");
+    const toInput = document.getElementById("to");
+
+    fromInput.addEventListener("change", () => {
+        if (!toInput.value) {
+            toInput.value = fromInput.value;
+        }
+    });
 
 
 
 }
 
-// document.addEventListener('DOMContentLoaded', () => {
-//     document.getElementById('searchBtn')?.addEventListener('click', () => {
-//         loadOfficeList({
-//             q: document.getElementById('q').value.trim(),
-//             mainGroup: document.getElementById('mg').value,
-//             dateFrom: document.getElementById('from').value,
-//             dateTo: document.getElementById('to').value
-//         });
-//     });
-//     // // initial load
-//     // loadOfficeList({});
-// });
+function getFilterParams() {
+  return {
+    officeNumber: document.getElementById("docId")?.value.trim() || "",
+    applicantName: document.getElementById("applicant")?.value.trim() || "",
+    mg: document.getElementById("mg")?.value || "",
+    table: document.querySelector("input[name='officeTable']:checked")?.value || "both",
+    dateFrom: document.getElementById("from")?.value || "",
+    dateTo: document.getElementById("to")?.value || ""
+  };
+}
+
+
+["docId", "applicant", "mg", "from", "to"].forEach(id => {
+  document.getElementById(id)?.addEventListener("input", () => {
+    loadOfficeList(getFilterParams());
+  });
+});
+
+document.querySelectorAll('input[name="tableFilter"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    loadOfficeList(getFilterParams());
+  });
+});
+
+
+// Auto-fill 'to' when 'from' changes
+const fromInput = document.getElementById("from");
+const toInput   = document.getElementById("to");
+fromInput.addEventListener("change", () => {
+    if (!toInput.value) {
+        toInput.value = fromInput.value;
+    }
+    loadOfficeList(getFilterParams());
+});
+
 
 document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -242,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function loadCases(opts = {}) {
     document.getElementById('step0').style.display = 'block';
     document.getElementById('step10').style.display = 'none';
-    document.getElementById('roleToggle_row').hidden = false;
+    // document.getElementById('roleToggle_row').hidden = false;
 
 
     const userId = Number(localStorage.getItem('userId') || 1); // استبدلها بالجلسة لاحقًا
@@ -1024,11 +1049,11 @@ async function initStep0() {
     // keep step 1 disabled while on list
 
     set(LS.lang, '');
-    const roleToggle_row = document.getElementById('roleToggle_row');
-    if (roleToggle_row)
-        roleToggle_row.style.display = 'flex';
-    else
-        return;
+    // const roleToggle_row = document.getElementById('roleToggle_row');
+    // if (roleToggle_row)
+    //     roleToggle_row.style.display = 'flex';
+    // else
+    //     return;
     document.querySelector('.stepper-item[data-step="1"]')
         ?.setAttribute('disabled', '');
     let role = localStorage.getItem('role')
@@ -1593,12 +1618,18 @@ function renderRequirements(requiredItems, uploadedItems = []) {
 
     const norm = s => (s || '').replace(/\s+/g, ' ').trim();
     const uploadedSet = new Set(uploadedItems.map(it => norm(it.Label || '')));
-
+    console.log(uploadedSet);
+    function normalizeLabel(str) {
+        return str.replace(/_\d+$/, ""); // remove underscore + trailing numbers
+        }
     requiredItems
         .filter(l => !norm(l).includes('أخرى'))
         .forEach((rawLabel, idx) => {
             const label = norm(rawLabel);
-            const alreadyUploaded = uploadedSet.has(label);
+            console.log(label);
+            const alreadyUploaded = Array.from(uploadedSet).some(
+                item => normalizeLabel(item) === normalizeLabel(label)
+                );
             requiredStatus[label] = alreadyUploaded;
 
             const row = document.createElement('div');
@@ -1841,7 +1872,7 @@ function initStep3() {
 function validateRequiredUploads() {
     const rows = document.querySelectorAll('.req-row');
     const missing = [];
-
+    
     rows.forEach(row => {
         const label = (row.querySelector('.req-label')?.textContent || '').trim();
         const stEl = row.querySelector('.req-status');
@@ -1851,7 +1882,7 @@ function validateRequiredUploads() {
             (stEl && stEl.classList.contains('ok')) ||
             /^✓/.test(txt) ||
             /تم\s*التحميل/.test(txt);
-
+        console.log(label);
         if (label && !isOk) missing.push(label);
     });
 

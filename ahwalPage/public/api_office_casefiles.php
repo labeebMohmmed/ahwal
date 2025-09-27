@@ -1,7 +1,7 @@
 <?php
 // api_office_casefiles.php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -14,8 +14,8 @@ try {
         exit;
     }
 
-    $pdoArch = db('ArchFilesDB');
-    $stmt = $pdoArch->prepare("
+    $pdo = db('ArchFilesDB');
+    $stmt = $pdo->prepare("
         SELECT id as FileID, المستند as Label, filename, Extension1
         FROM [ArchFilesDB].[dbo].[TableGeneralArch]
         WHERE رقم_المرجع = ? AND docTable = ?

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
+require __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');                           // <-- no 2nd arg
@@ -14,8 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
-require __DIR__ . '/db.php';
-$pdo = db();
+
 
 // ---------- helpers ----------
 function splitCommaArab(?string $s): array {

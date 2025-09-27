@@ -1,6 +1,5 @@
 <?php
-require __DIR__ . '/db.php';
-
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
@@ -18,7 +17,7 @@ if ($group === '' || !in_array($group, $allowedGroups, true)) {
 }
 
 try {
-  $pdo = db();
+  
   $sql = "
     WITH latest AS (
       SELECT [ID],[altColName],[altSubColName],[Lang],[maingroups],

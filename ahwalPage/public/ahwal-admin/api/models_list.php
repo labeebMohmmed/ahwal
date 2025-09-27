@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'db.php';
-$pdo= db();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
 // TEMP while debugging
 ini_set('display_errors', '1');
 error_reporting(E_ALL);

@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL); ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -65,7 +65,7 @@ function generateDocNumber(PDO $pdo, string $table, string $officeCode, string $
 
 
 try {
-  $pdo = db();
+  
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
   // 🔹 Get employee name from TableUser

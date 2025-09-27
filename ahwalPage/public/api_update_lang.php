@@ -2,7 +2,8 @@
 // api_office_details_upsert.php — update only the language column (اللغة)
 
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
+
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -24,8 +25,6 @@ try {
         echo json_encode(['ok'=>false,'error'=>'bad payload','input'=>$data], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    $pdo = db();
 
     // Decide target table
     $table = ($mainGroup === 'توكيل') ? 'dbo.TableAuth' : 'dbo.TableCollection';

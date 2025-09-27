@@ -2,15 +2,14 @@
 // api_proc_req.php?templateId=123
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 $templateId = isset($_GET['templateId']) ? (int)$_GET['templateId'] : 0;
 if ($templateId <= 0) { echo json_encode(['row'=>null], JSON_UNESCAPED_UNICODE); exit; }
 
-try {
-  $pdo = db();
+try {  
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
   // 1) Get ReqID from TableAddModel

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -12,11 +12,6 @@ try {
         exit;
     }
     $modelId = (int)$modelId;
-
-    // ---- 2) Connect (SQLSRV PDO) ----
-    // Adjust server, DB, auth as needed
-    $conn = db();
-
     // ---- 3) Query ----
     // We only need المطلوب_رقم1..9 from dbo.TableProcReq where ModelID = ?
     $sql = "
@@ -31,7 +26,7 @@ try {
                 + m.altSubColName COLLATE Arabic_100_CI_AI_KS)
         where m.id = ?
     ";
-    $stmt = $conn->prepare($sql);
+    $stmt = $pdo->prepare($sql);
     $stmt->execute([$modelId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 

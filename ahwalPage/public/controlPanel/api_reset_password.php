@@ -23,7 +23,7 @@ try {
     $stmt = $pdo->prepare("
         UPDATE [AhwalDataBase].[dbo].[TableUser]
         SET كلمة_المرور = ?, 
-            RestPAss = '',
+            RestPAss = 'reset',
             comment = CONCAT(ISNULL(comment,''), CHAR(13)+CHAR(10),
               CONVERT(varchar, GETDATE(), 120) + ' | Password reset by admin')
         WHERE ID = ?

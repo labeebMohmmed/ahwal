@@ -1,9 +1,6 @@
 <?php
-// api_office_details_upsert.php — save itextN/itxtDateN/icomboN/icheckN
-// to dbo.TableAuth (for mainGroup='توكيل') or dbo.TableCollection (else)
-
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -25,8 +22,6 @@ try {
         echo json_encode(['ok'=>false,'error'=>'bad payload','input'=>$data], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    $pdo = db();
 
     // Decide table + mapping
     if ($mainGroup === 'توكيل') {

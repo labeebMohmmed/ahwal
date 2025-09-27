@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 try{
   $in = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -13,7 +13,6 @@ try{
   }
 
   
-  $pdo = db();
   $SCHEMA='online';
 
   $st = $pdo->prepare("SELECT PartyJson FROM [$SCHEMA].[Cases] WHERE CaseID=?");

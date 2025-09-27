@@ -2,13 +2,11 @@
 // api_tablechar.php — normalized Tablechar with safe caching (no UpdatedAt column needed)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-require __DIR__ . '/db.php';
-
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 try {
-  $pdo = db();
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
   $schema  = 'dbo';

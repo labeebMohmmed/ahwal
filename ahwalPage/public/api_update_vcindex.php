@@ -1,7 +1,7 @@
 <?php
 // api_update_vcindex.php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -15,7 +15,6 @@ try {
         exit;
     }
 
-    $pdo = db();
     $sql = "UPDATE [AhwalDataBase].[dbo].[TableSettings]
             SET VCIndesx = :vcIndex
             WHERE ID = 1";   // adjust if multiple rows exist

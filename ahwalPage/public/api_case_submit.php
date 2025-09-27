@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL); ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -19,8 +19,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !preg_match('/^\d{2}:\d{2}$/'
 $slot = $date . ' ' . $hour . ':00'; // DATETIME2(0) string
 
 try {
-  $pdo = db();
-
+  
   // Enforce capacity with SERIALIZABLE + UPDLOCK|HOLDLOCK (prevents race)
   $pdo->exec("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
   $pdo->beginTransaction();

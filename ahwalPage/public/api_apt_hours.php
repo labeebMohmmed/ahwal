@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL); ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -14,8 +14,6 @@ $MAX = 3;
 
 $dsn = "sqlsrv:Server=localhost;Database=AhwalDataBase;Encrypt=yes;TrustServerCertificate=yes";
 try {
-  $pdo = db();
-
   // Count by hour for the given date
   $st = $pdo->prepare("
     SELECT RIGHT('0'+CAST(DATEPART(HOUR, ApptSlot) AS VARCHAR(2)),2)+':00' AS Hh,

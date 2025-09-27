@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'db.php';
-$pdo= db();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
 
 $data = json_decode(file_get_contents('php://input'), true) ?? [];
 $values = (array)($data['values'] ?? []);

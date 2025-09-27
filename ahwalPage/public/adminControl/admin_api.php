@@ -2,7 +2,7 @@
 $sql = 'ALTER TABLE ' . $conf['table'] . ' ADD ' . implode(', ', $defs) . ';';
 db()->exec($sql);
 respond(true, 'column added');
-}
+
 
 
 function drop_col(string $which): void {

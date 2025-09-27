@@ -4,13 +4,12 @@ error_reporting(E_ALL); ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 
 $caseId = isset($_GET['caseId']) ? (int)$_GET['caseId'] : 0;
 if ($caseId <= 0) { echo json_encode(['ok'=>false,'error'=>'missing caseId']); exit; }
 
 try {
-  $pdo = db();
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
   $st = $pdo->prepare("

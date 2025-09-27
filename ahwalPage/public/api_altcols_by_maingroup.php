@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
@@ -21,7 +21,7 @@ if (!in_array($group, $allowedGroups, true)) {
 $dsn = "sqlsrv:Server=localhost;Database=AhwalDataBase;Encrypt=yes;TrustServerCertificate=yes";
 
 try {
-  $pdo = db();
+  
   // 1) latest row per (altColName, altSubColName) for selected Lang
   // 2) tag each row into one of the five main groups
   // 3) filter by chosen main group

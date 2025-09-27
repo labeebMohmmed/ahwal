@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'db.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -16,7 +16,7 @@ if (!in_array($col, $WL, true)) {
 if ($limit <= 0 || $limit > 100) $limit = 20;
 
 try{
-  $pdo = db(); // أو db('AhwalDataBase')
+  
   // أعلى القيم تكراراً وحداثة (إن وُجد UpdatedAt)
   $sql = "
     SELECT TOP ($limit) v

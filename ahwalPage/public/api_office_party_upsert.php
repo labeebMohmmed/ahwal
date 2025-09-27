@@ -1,17 +1,12 @@
 <?php
-// api_office_party_upsert.php
-// Upserts applicants/authenticated/witnesses into office tables,
-// supporting BOTH dbo.TableAuth (mainGroup='توكيل') and dbo.TableCollection (else).
-
 declare(strict_types=1);
-
+require __DIR__ . '/auth.php';
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-require __DIR__ . '/db.php';
 
 if (isset($_GET['ping'])) {
     echo json_encode(['ok' => true, 'msg' => 'api_office_party_upsert.php is reachable']);
@@ -40,9 +35,6 @@ try {
 
     // Decide target table by mainGroup
     $table = ($mainGroup === 'توكيل') ? 'dbo.TableAuth' : 'dbo.TableCollection';
-
-    // ---- DB ----
-    $pdo = db();
 
     // Load row
     $st = $pdo->prepare("SELECT TOP 1 * FROM $table WHERE ID = :id");

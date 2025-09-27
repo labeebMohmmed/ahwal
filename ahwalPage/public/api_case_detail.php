@@ -3,12 +3,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 $caseId = (int)($_GET['caseId'] ?? 0);
 if ($caseId <= 0) { http_response_code(400); echo json_encode(['error'=>'caseId required']); exit; }
-
-
-$pdo = db();
 
 $st = $pdo->prepare("
   SELECT [CaseID],[ExternalRef],[UserID],[ModelID],[Lang],[Status],

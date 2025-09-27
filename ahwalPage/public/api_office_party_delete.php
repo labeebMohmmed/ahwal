@@ -1,11 +1,6 @@
 <?php
 declare(strict_types=1);
-
-// api_office_party_delete.php
-// Remove one applicant/authenticated/witness from dbo.TableAuth,
-// honoring comma/Arabic-comma lists and alignment rules.
-
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -19,8 +14,6 @@ try {
         echo json_encode(['ok'=>false,'error'=>'bad input'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    $pdo = db();
 
     // Helpers
     $split_list = function ($s): array {

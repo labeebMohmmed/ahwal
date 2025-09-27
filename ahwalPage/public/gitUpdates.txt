@@ -1,0 +1,12 @@
+one time
+git rm --cached ahwalPage/public/db.php
+git commit -m "Stop tracking db.php (local-only config)"
+git push origin main
+
+Device A:
+git add .
+git commit -m "Describe my change"
+git push origin main
+
+device B:
+git pull origin main

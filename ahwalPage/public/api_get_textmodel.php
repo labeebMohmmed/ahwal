@@ -2,7 +2,7 @@
 // api_get_textmodel.php?template_id=123&lang=ar
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -26,7 +26,7 @@ if ($templateId <= 0) {
 }
 
 try {
-  $pdo = db();
+  
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
   // Pull the whole row; we’ll pick columns in PHP.

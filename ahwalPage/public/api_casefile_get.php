@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
+
 try {
   $fileId = isset($_GET['fileId']) ? (int)$_GET['fileId'] : 0;
   if ($fileId <= 0) { http_response_code(400); exit('bad fileId'); }

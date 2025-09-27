@@ -8,7 +8,7 @@ ini_set('display_errors', 1);
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 
 $altCol = isset($_GET['altCol']) ? (string)$_GET['altCol'] : '';
 $altSub = isset($_GET['altSub']) ? (string)$_GET['altSub'] : '';
@@ -25,8 +25,6 @@ if ($altCol === '' || $altSub === '') {
   ], JSON_UNESCAPED_UNICODE);
   exit;
 }
-
-$pdo = db(); // ensure UTF-8 for SQLSRV
 
 // Normalize (Arabic comma + whitespace)
 $norm = static function (string $s): string {

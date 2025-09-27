@@ -4,10 +4,8 @@ declare(strict_types=1);
 ini_set('display_errors', '1'); // TEMP
 error_reporting(E_ALL);
 
-require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
-// require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'db.php';
-// $pdo= db();
-
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'db.php';
+$pdo= db();
 
 header('Content-Type: application/json; charset=utf-8');
 

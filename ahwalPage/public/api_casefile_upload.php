@@ -1,18 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
-/**
- * POST multipart/form-data
- *  - caseId   (int, required)
- *  - label    (string, required)
- *  - userId   (int, optional)
- *  - kind     (string, optional)   // not stored; echoed back
- *  - file     (required)           // <= 3MB; pdf/jpg/png/docx
- *
- * Table: [online].[CaseFiles] (adjust schema below if yours is [dbo])
- */
-
-
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {

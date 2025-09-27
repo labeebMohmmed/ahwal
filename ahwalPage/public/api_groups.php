@@ -2,7 +2,8 @@
 // api_groups.php?lang=ar|en
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
@@ -13,7 +14,6 @@ if ($lang !== 'ar' && $lang !== 'en') $lang = 'ar';
 $dbLang = ($lang === 'en') ? 'الانجليزية' : 'العربية';
 
 try {
-    $pdo = db();
 
     // Latest row per (altColName, altSubColName), then count subgroups per group
     $sql = "

@@ -6,11 +6,11 @@
 declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
+require __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-require __DIR__ . '/db.php';
 
 try {
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -28,8 +28,6 @@ try {
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    $pdo = db();
 
     // Decide target table and column names
     if ($mainGroup === 'توكيل') {

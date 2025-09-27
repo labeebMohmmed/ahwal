@@ -1,25 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';
-
-/**
- * POST multipart/form-data
- *  - caseId   (int, required)
- *  - label    (string, required)
- *  - userId   (int, optional)
- *  - kind     (string, optional)   // echoed back only
- *  - file     (required)           // <= 3MB; pdf/jpg/png/docx
- *
- * Saves into: ArchFilesDB.dbo.TableGeneralArch
- *   - رقم_المرجع    INT
- *   - المستند       NVARCHAR
- *   - filename      NVARCHAR
- *   - Extension1    NVARCHAR(??)  <-- we store ".ext" like ".pdf"
- *   - Data1         VARBINARY(MAX)
- *   - التاريخ       DATETIME
- *   - الموظف        INT NULL
- */
-
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {

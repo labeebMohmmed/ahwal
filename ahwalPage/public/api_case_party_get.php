@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/db.php';header('Content-Type: application/json; charset=utf-8');
+require __DIR__ . '/auth.php';
+header('Content-Type: application/json; charset=utf-8');
 
 
 try {
@@ -10,9 +11,6 @@ try {
         echo json_encode(['ok' => false, 'error' => 'bad caseId'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    // DB connection
-    $pdo = db();
 
     // Schema (adjust if needed)
     $SCHEMA = 'online';

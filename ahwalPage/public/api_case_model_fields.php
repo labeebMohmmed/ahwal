@@ -2,7 +2,7 @@
 // api_case_details_meta.php — return model meta by modelId only
 declare(strict_types=1);
 
-require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -13,7 +13,6 @@ try {
         exit;
     }
 
-    $pdo = db();
 
     // Load the template from TableAddModel
     $rowTpl = $pdo->prepare("SELECT * FROM dbo.TableAddModel WHERE ID = ?");

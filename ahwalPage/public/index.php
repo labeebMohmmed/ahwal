@@ -1,3 +1,8 @@
+<?php
+require __DIR__ . '/auth.php'; // authentication check
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -16,15 +21,16 @@
 
 
 
-<div id="roleToggle_row" class="toolbar-row" style="gap:12px;align-items:center;justify-content:space-between;margin:8px 0 12px;" >
-  <label class="muted" style="display:flex;align-items:center;gap:8px;">
-    <input id="roleToggle" type="checkbox" />
+<div id="roleToggle_row" class="toolbar-row" hidden>
+  <label class="muted" style="display:none;">
+    <input id="roleToggle" type="checkbox" checked />
     <span>وضع الموظف (للاختبار)</span>
   </label>
   <span id="roleBadge" class="badge" style="padding:4px 8px;border-radius:8px;background:#e5e7eb;color:#111827;font-size:.85rem;">
     الدور: مراجع
   </span>
 </div>
+
 
 <!-- Mobile stepper (shown only on small screens via CSS) -->
 <nav id="stepperMobile" class="stepper-mobile" role="navigation" aria-label="Progress" dir="rtl" hidden>
@@ -86,22 +92,40 @@
 <section id="step10" class="card" style="max-width: 80%" dir="rtl" hidden>
   <h2 class="card-title">قائمة المعاملات</h2>
   <div class="field-block" style="flex-wrap:wrap;">
-    <input id="q" class="input" style="width: 130px; margin: 5px"  placeholder="ابحث بالرقم أو الاسم">
-    <select id="mg" style="width: 120px; margin: 5px" ><option value="">كل المجموعات</option><option>توكيل</option><option>غير ذلك</option></select>
+    <input id="docId" class="input" style="width: 130px; margin: 5px" placeholder="ابحث بالرقم">
+    <input id="applicant" class="input" style="width: 180px; margin: 5px" placeholder="ابحث بالاسم">
     <input id="from" style="width: 135px; margin: 5px" type="date">
     <input id="to" style="width: 135px; margin: 5px" type="date">
-    <button id="searchBtn" style="width: 50px; margin: 5px"  class="btn">بحث</button>
+      <!-- New radio filter -->
+    
+    
     <button id="btnNewProcess10" class="btn">معاملة جديدة</button>
   </div>
+  <div class="field-block" style="margin: 10px 5px;">
+    <label><input type="radio" name="tableFilter" value="both" checked> الكل</label>
+    <label><input type="radio" name="tableFilter" value="Auth"> توكيل</label>
+    <label><input type="radio" name="tableFilter" value="Collection"> تحصيل</label>
+  </div>
+
+
   <div id="autoTodayNote" class="muted" hidden>تم عرض طلبات اليوم فقط لكثرة النتائج.</div>
   <table class="table">
-    <thead><tr>
-      <th>رقم المكتب</th><th>المجموعة</th><th>مقدم الطلب</th><th>الهوية</th><th>التاريخ</th><th>الحالة</th><th>الطريقة</th>
-    </tr></thead>
+    <thead>
+      <tr>
+        <th>رقم المكتب</th>
+        <th>المجموعة</th>
+        <th>مقدم الطلب</th>
+        <th>الهوية</th>
+        <th>التاريخ</th>
+        <th>الحالة</th>
+        <th>الطريقة</th>
+      </tr>
+    </thead>
     <tbody id="officeBody"></tbody>
   </table>
-  <div class="table-mobile" id="casesOfficeTableMobile" >
-    </div> 
+  <div class="table-mobile" id="casesOfficeTableMobile"></div>
+
+  <div id="pager" style="margin-top:10px; text-align:center;"></div>
 </section>
 
 

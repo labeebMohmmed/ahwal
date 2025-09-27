@@ -1,6 +1,7 @@
 <?php
 // public/api_cases_list.php
 declare(strict_types=1);
+require __DIR__ . '/auth.php';
 
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
@@ -21,8 +22,7 @@ function bad(string $m){ out(['ok'=>false,'error'=>$m], 400); }
 function svr(string $m){ out(['ok'=>false,'error'=>$m], 500); }
 
 // If you have a db() helper, require it. If not, we'll fallback to direct PDO.
-$pdo = null;
-$helper = __DIR__ . '/db.php';
+
 if (is_file($helper)) {
   require $helper; // must expose function db(): PDO
 }
@@ -41,10 +41,7 @@ try {
   $altCol   = trim((string)($_GET['altColName'] ?? ''));            // contains
   $altSub   = trim((string)($_GET['altSubColName'] ?? ''));         // contains
 
-  // ---- DB connect ----
-  $pdo = db();
- 
-
+  
   // ---- WHERE ----
   $w = ["oc.[UserID] = :uid"];
   $p = [':uid' => $userId];
