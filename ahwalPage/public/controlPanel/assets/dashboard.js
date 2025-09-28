@@ -1664,49 +1664,60 @@ async function showSettingsPage(container) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    const navLinks = document.querySelectorAll("nav a[data-page]");
-    const main = document.getElementById("dashboard-main");
+  const navLinks = document.querySelectorAll("nav a[data-page]");
+  const main = document.getElementById("dashboard-main");
 
-    navLinks.forEach(link => {
-        link.addEventListener("click", e => {
-            e.preventDefault();
-            const page = link.getAttribute("data-page");
+  navLinks.forEach(link => {
+    link.addEventListener("click", e => {
+      const href = (link.getAttribute("href") || "").trim();
 
-            switch (page) {
-                case "headDepartment":
-                    ControlPanel(main);
-                    break;
+      // If this is a "real" link: allow normal navigation
+      const looksLikeRealLink =
+        href && href !== "#" && href !== "" &&
+        !href.startsWith("javascript:") && !href.startsWith("mailto:") &&
+        (
+          href.startsWith("/") ||    // root-relative -> real
+          href.startsWith("http") || // external URL -> real
+          href.includes(".php")      // server-side page -> real
+        );
 
-                case "users":
-                    usersControl(main);
-                    break;
+      if (looksLikeRealLink) {
+        // Do not prevent default — let the browser navigate.
+        // If you still want to run some tracking or cleanup, do it but don't preventDefault.
+        return;
+      }
 
-                case "mandoubs":
-                    mandoubControl(main);
-                    break;
+      // Otherwise treat as SPA/internal navigation
+      e.preventDefault();
+      const page = link.getAttribute("data-page");
 
-                case "officeCasesControl":
-                    officeCasesControl(main);
-                    break;
-
-                case "concularDoc":
-                    consularDocsControl(main);
-                    break;
-
-                case "reports":
-                    reportsControl(main);
-                    break;
-
-                case "settings":
-                    showSettingsPage(main);
-                    break;
-
-                default:
-                    showDefaultTable(main);
-            }
-        });
+      switch (page) {
+        case "headDepartment":
+          ControlPanel(main);
+          break;
+        case "users":
+          usersControl(main);
+          break;
+        case "mandoubs":
+          mandoubControl(main);
+          break;
+        case "officeCasesControl":
+          officeCasesControl(main);
+          break;
+        case "concularDoc":
+          consularDocsControl(main);
+          break;
+        case "reports":
+          reportsControl(main);
+          break;
+        case "settings":
+          showSettingsPage(main);
+          break;
+        default:
+          showDefaultTable(main);
+      }
     });
+  });
 
-    // ✅ Load office cases list immediately
-    // showSettingsPage(main);
+  consularDocsControl(main);
 });
