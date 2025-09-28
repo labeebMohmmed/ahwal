@@ -789,7 +789,8 @@ function apiResolve(path) {
             const textAlign = isEnglish ? 'left' : 'right';
             const dir = isEnglish ? 'ltr' : 'rtl';
             const index = window.comboData.settings[0].VCIndesx;
-            if (isEnglish) {
+            console.log(window.comboData);
+                if (isEnglish) {
                 signer = window.comboData.diplomats[index].EngEmployeeName;
                 signer_role = window.comboData.diplomats[index].AuthenticTypeEng
 
@@ -2268,6 +2269,7 @@ async function buildPayloadFromUI() {
         "نص_المعاملة": text,
         "text": text,
         "النص.":text,
+        "النص":text,
         "التوثيق": authenticater_text.value,
         "مدة_الاعتماد": "",
         "صفة_الموقع": signer_role,

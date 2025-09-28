@@ -946,7 +946,7 @@ function consularDocsControl(main) {
                 const group = btn.dataset.group;
                 console.log("edit-app clicked:", group, id); // ✅ will log values now
                 // alert("❌ API Error: " + group + id);
-                window.location.href = `http://192.168.100.100:8000/index.php?group=${encodeURIComponent(group)}&id=${encodeURIComponent(id)}`;
+                window.location.href = `http://192.168.0.68:8000/index.php?group=${encodeURIComponent(group)}&id=${encodeURIComponent(id)}`;
             });
         });
 

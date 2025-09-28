@@ -2479,15 +2479,17 @@ function validatePersonDetailed(section, p, requirements) {
 
     } else {
         // applicants & authenticated
-        if (!id.type) {
-            errors.pf_id_type = 'نوع الهوية مطلوب.';
-            list.push('نوع الهوية مطلوب.');
-        }
-        if (!id.number?.trim()) {
-            errors.pf_id_number = 'رقم الهوية مطلوب.';
-            list.push('رقم الهوية مطلوب.');
-        }
+        
         if (section !== 'authenticated') {
+            if (!id.type) {
+                errors.pf_id_type = 'نوع الهوية مطلوب.';
+                list.push('نوع الهوية مطلوب.');
+            }
+            if (!id.number?.trim()) {
+                errors.pf_id_number = 'رقم الهوية مطلوب.';
+                list.push('رقم الهوية مطلوب.');
+            }
+            
             if (!id.issuer) {
                 errors.pf_id_type = 'مكان الإصدار مطلوب.';
                 list.push('مكان الإصدار مطلوب.');
