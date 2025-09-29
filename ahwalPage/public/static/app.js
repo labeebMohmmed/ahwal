@@ -223,26 +223,41 @@ function getFilterParams() {
   return {
     officeNumber: document.getElementById("docId")?.value.trim() || "",
     applicantName: document.getElementById("applicant")?.value.trim() || "",
-    mg: document.getElementById("mg")?.value || "",
-    table: document.querySelector("input[name='officeTable']:checked")?.value || "both",
+    // CORRECTED: use the radio group name 'tableFilter'
+    table: document.querySelector("input[name='tableFilter']:checked")?.value || "both",
     dateFrom: document.getElementById("from")?.value || "",
     dateTo: document.getElementById("to")?.value || ""
   };
 }
 
+// helper to call loader and log params for debugging
+function reloadList() {
+  const params = getFilterParams();
+  console.log("Loading office list with params:", params); // <-- debug
+  loadOfficeList(params);
+}
 
-["docId", "applicant", "mg", "from", "to"].forEach(id => {
-  document.getElementById(id)?.addEventListener("input", () => {
-    loadOfficeList(getFilterParams());
-  });
+// Text inputs: listen to 'input' (immediate)
+["docId", "applicant"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", reloadList);
 });
 
-document.querySelectorAll('input[name="tableFilter"]').forEach(radio => {
-  radio.addEventListener("change", () => {
-    loadOfficeList(getFilterParams());
-  });
+// Date inputs: listen to 'change' (more consistent across browsers)
+["from", "to"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", reloadList);
 });
 
+// Radio group: listen to change events (one handler for all radios)
+document.querySelectorAll("input[name='tableFilter']").forEach(radio => {
+  radio.addEventListener("change", reloadList);
+});
+
+// Optional: trigger initial load on DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  reloadList();
+});
 
 // Auto-fill 'to' when 'from' changes
 const fromInput = document.getElementById("from");

@@ -56,7 +56,7 @@ header("Pragma: no-cache");
 
 <!-- BODY CONTENT (keep header/footer untouched) -->
 <nav class="stepper" aria-label="Progress">
-  <button class="stepper-item is-big is-current" data-step="0" aria-current="step">
+  <button class="stepper-item is-big is-current" data-step="0" aria-current="step" style="display: none">
     <span class="idx">0</span><span class="lbl">القائمة</span>
   </button>
   
@@ -91,21 +91,18 @@ header("Pragma: no-cache");
 
 <section id="step10" class="card" style="max-width: 80%" dir="rtl" hidden>
   <h2 class="card-title">قائمة المعاملات</h2>
-  <div class="field-block" style="flex-wrap:wrap;">
-    <input id="docId" class="input" style="width: 130px; margin: 5px" placeholder="ابحث بالرقم">
-    <input id="applicant" class="input" style="width: 180px; margin: 5px" placeholder="ابحث بالاسم">
-    <input id="from" style="width: 135px; margin: 5px" type="date">
-    <input id="to" style="width: 135px; margin: 5px" type="date">
-      <!-- New radio filter -->
-    
-    
-    <button id="btnNewProcess10" class="btn">معاملة جديدة</button>
-  </div>
+<div class="field-block" style="flex-wrap:wrap;">
   <div class="field-block" style="margin: 10px 5px;">
     <label><input type="radio" name="tableFilter" value="both" checked> الكل</label>
     <label><input type="radio" name="tableFilter" value="Auth"> توكيل</label>
     <label><input type="radio" name="tableFilter" value="Collection"> تحصيل</label>
   </div>
+  <input id="docId" class="input" style="width: 130px; margin: 5px" placeholder="ابحث بالرقم">
+  <input id="applicant" class="input" style="width: 180px; margin: 5px" placeholder="ابحث بالاسم">
+  <input id="from" style="width: 135px; margin: 5px" type="date">
+  <input id="to" style="width: 135px; margin: 5px" type="date">
+  <button id="btnNewProcess10" class="btn">معاملة جديدة</button>
+</div>
 
 
   <div id="autoTodayNote" class="muted" hidden>تم عرض طلبات اليوم فقط لكثرة النتائج.</div>
