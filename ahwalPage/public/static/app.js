@@ -146,6 +146,50 @@ const CasesUI = {
     });
 })();
 
+// safe HTML escape
+function escapeHtml(text) {
+    return String(text == null ? '' : text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+/**
+ * Prepare applicant display name:
+ * - if contains '_' keep first part and append ' وآخرون'
+ * - if empty -> 'غير مدرج'
+ * - truncate to maxChars and add ellipsis
+ * - returns escaped HTML-safe string
+ */
+function processApplicantName(name, maxChars = 100) {
+    // empty
+    if (name === undefined || name === null || String(name).trim() === '') {
+        return 'غير مدرج';
+    }
+
+    const full = String(name).trim();
+
+    // split on underscore and keep first meaningful part
+    let display = full;
+    if (full.includes('_')) {
+        const parts = full.split('_').map(s => s.trim()).filter(Boolean);
+        if (parts.length > 0) {
+            display = parts[0] + ' وآخرون'; // keeps first part then "and others"
+        } else {
+            display = full;
+        }
+    }
+
+    // truncate if too long
+    if (display.length > maxChars) {
+        display = display.slice(0, maxChars) + '…';
+    }
+
+    return escapeHtml(display);
+}
+
 
 async function loadOfficeList(params = {}) {
     const qs = new URLSearchParams(params).toString();
@@ -167,15 +211,73 @@ async function loadOfficeList(params = {}) {
 
         const tr = document.createElement('tr');
         tr.className = `${r.StatusTag} ${r.MethodTag}`; // highlight
+        // helpers (put once in your utilities file or above where you build rows)
+        function escapeHtml(text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function truncateChars(s, max = 50) {
+            const str = String(s == null ? '' : s).trim();
+            if (str.length <= max) return str;
+            return str.slice(0, max) + '…';
+        }
+
+        function processApplicantName(name, maxChars = 50) {
+            if (name === undefined || name === null || String(name).trim() === '') {
+                return { display: 'غير مدرج', full: '' };
+            }
+            const full = String(name).trim();
+
+            // If contains underscore, keep first part and append " وآخرون"
+            let display = full;
+            if (full.includes('_')) {
+                const parts = full.split('_').map(p => p.trim()).filter(Boolean);
+                if (parts.length > 0) {
+                    display = parts[0] + ' وآخرون';
+                }
+            }
+
+            // Truncate display if too long
+            if (display.length > maxChars) {
+                display = display.slice(0, maxChars) + '…';
+            }
+
+            return { display, full };
+        }
+
+        function formatDateShort(value) {
+            if (!value) return '';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toISOString().slice(0, 10); // YYYY-MM-DD
+        }
+
+        // Usage when building row `r`:
+        const applicant = processApplicantName(r.ApplicantName, 50);
+        const officeNumber = escapeHtml(r.OfficeNumber ?? '');
+        const mainGroup = escapeHtml(r.MainGroup ?? '');
+        const applicantDisplay = escapeHtml(applicant.display);
+        const applicantFull = escapeHtml(String(r.ApplicantName ?? ''));
+        const idNumber = escapeHtml(r.IdNumber ?? 'غير مدرج');
+        const dateShort = formatDateShort(r.Date) || '';
+        const archStatus = escapeHtml(r.ArchStatus ?? 'معاملة جديدة');
+        const method = escapeHtml(r.Method ?? 'حضور مباشرة إلى القنصلية');
+
         tr.innerHTML = `
-            <td>${r.OfficeNumber}</td>
-            <td>${r.MainGroup}</td>
-            <td>${r.ApplicantName || 'غير مدرج'}</td>
-            <td>${r.IdNumber ?? 'غير مدرج'}</td>
-            <td>${(r.Date || '').toString().slice(0, 10)}</td>
-            <td>${r.ArchStatus ?? 'معاملة جديدة'}</td>
-            <td>${r.Method ?? 'حضور مباشرة إلى القنصلية'}</td>
+            <td>${officeNumber}</td>
+            <td>${mainGroup}</td>
+            <td title="${applicantFull}">${applicantDisplay}</td>
+            <td>${idNumber}</td>
+            <td>${dateShort}</td>
+            <td>${archStatus}</td>
+            <td>${method}</td>
             `;
+
         tr.addEventListener('click', () => {
             // open detail later via api_office_case_detail.php?table=...&id=...
             console.log('Open', r.OfficeTable, r.OfficeId);
@@ -220,48 +322,48 @@ async function loadOfficeList(params = {}) {
 }
 
 function getFilterParams() {
-  return {
-    officeNumber: document.getElementById("docId")?.value.trim() || "",
-    applicantName: document.getElementById("applicant")?.value.trim() || "",
-    // CORRECTED: use the radio group name 'tableFilter'
-    table: document.querySelector("input[name='tableFilter']:checked")?.value || "both",
-    dateFrom: document.getElementById("from")?.value || "",
-    dateTo: document.getElementById("to")?.value || ""
-  };
+    return {
+        officeNumber: document.getElementById("docId")?.value.trim() || "",
+        applicantName: document.getElementById("applicant")?.value.trim() || "",
+        // CORRECTED: use the radio group name 'tableFilter'
+        table: document.querySelector("input[name='tableFilter']:checked")?.value || "both",
+        dateFrom: document.getElementById("from")?.value || "",
+        dateTo: document.getElementById("to")?.value || ""
+    };
 }
 
 // helper to call loader and log params for debugging
 function reloadList() {
-  const params = getFilterParams();
-  console.log("Loading office list with params:", params); // <-- debug
-  loadOfficeList(params);
+    const params = getFilterParams();
+    console.log("Loading office list with params:", params); // <-- debug
+    loadOfficeList(params);
 }
 
 // Text inputs: listen to 'input' (immediate)
 ["docId", "applicant"].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener("input", reloadList);
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", reloadList);
 });
 
 // Date inputs: listen to 'change' (more consistent across browsers)
 ["from", "to"].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener("change", reloadList);
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", reloadList);
 });
 
 // Radio group: listen to change events (one handler for all radios)
 document.querySelectorAll("input[name='tableFilter']").forEach(radio => {
-  radio.addEventListener("change", reloadList);
+    radio.addEventListener("change", reloadList);
 });
 
 // Optional: trigger initial load on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
-  reloadList();
+    reloadList();
 });
 
 // Auto-fill 'to' when 'from' changes
 const fromInput = document.getElementById("from");
-const toInput   = document.getElementById("to");
+const toInput = document.getElementById("to");
 fromInput.addEventListener("change", () => {
     if (!toInput.value) {
         toInput.value = fromInput.value;
@@ -1636,7 +1738,7 @@ function renderRequirements(requiredItems, uploadedItems = []) {
     console.log(uploadedSet);
     function normalizeLabel(str) {
         return str.replace(/_\d+$/, ""); // remove underscore + trailing numbers
-        }
+    }
     requiredItems
         .filter(l => !norm(l).includes('أخرى'))
         .forEach((rawLabel, idx) => {
@@ -1644,7 +1746,7 @@ function renderRequirements(requiredItems, uploadedItems = []) {
             console.log(label);
             const alreadyUploaded = Array.from(uploadedSet).some(
                 item => normalizeLabel(item) === normalizeLabel(label)
-                );
+            );
             requiredStatus[label] = alreadyUploaded;
 
             const row = document.createElement('div');
@@ -1887,7 +1989,7 @@ function initStep3() {
 function validateRequiredUploads() {
     const rows = document.querySelectorAll('.req-row');
     const missing = [];
-    
+
     rows.forEach(row => {
         const label = (row.querySelector('.req-label')?.textContent || '').trim();
         const stEl = row.querySelector('.req-status');
@@ -2494,7 +2596,7 @@ function validatePersonDetailed(section, p, requirements) {
 
     } else {
         // applicants & authenticated
-        
+
         if (section !== 'authenticated') {
             if (!id.type) {
                 errors.pf_id_type = 'نوع الهوية مطلوب.';
@@ -2504,7 +2606,7 @@ function validatePersonDetailed(section, p, requirements) {
                 errors.pf_id_number = 'رقم الهوية مطلوب.';
                 list.push('رقم الهوية مطلوب.');
             }
-            
+
             if (!id.issuer) {
                 errors.pf_id_type = 'مكان الإصدار مطلوب.';
                 list.push('مكان الإصدار مطلوب.');

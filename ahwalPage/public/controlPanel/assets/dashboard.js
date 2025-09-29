@@ -864,24 +864,79 @@ function consularDocsControl(main) {
         j.cases.forEach(c => {
             const table = c.OfficeTable === "Auth" ? "TableAuth" : "TableCollection";
 
-            html += `
-            <tr>
-            <td>${c.OfficeNumber || ""}</td>
-            <td>${c.ApplicantName || ""}</td>
-            <td>${c.Date || ""}</td>
-            <td>${c.MainGroup || ""}</td>
-            <td>${c.StatusTag || c.ArchStatus || ""}</td>
-            <td>${c.MethodTag || c.Method || ""}</td>
-            <td>
-                <button class="btn-xs btn-ghost show-files" data-id="${c.OfficeId}" data-table="${table}">مستندات</button>
-                <button class="btn-xs btn-edit edit-app" data-group="${c.MainGroup}" data-id="${c.OfficeId}" data-table="${table}">تعديل</button>
-                ${c.PayloadJson
-                    ? `<button class="btn-xs btn-primary print-doc" data-name="${c.ApplicantName}" data-id="${c.OfficeId}" data-table="${table}">طباعة</button>`
-                    : ""
+            // ---------- helpers (put once in your utilities file) ----------
+            function escapeHtml(text) {
+                return String(text == null ? '' : text)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+
+            function processApplicantName(name, maxChars = 50) {
+                if (name === undefined || name === null || String(name).trim() === '') {
+                    return { display: 'غير مدرج', full: '' };
                 }
-            </td>
-            </tr>
-        `;
+                const full = String(name).trim();
+
+                // If contains underscore, keep first part and append " وآخرون"
+                let display = full;
+                if (full.includes('_')) {
+                    const parts = full.split('_').map(p => p.trim()).filter(Boolean);
+                    if (parts.length > 0) {
+                        display = parts[0] + ' وآخرون';
+                    }
+                }
+
+                // Truncate display if too long
+                if (display.length > maxChars) {
+                    display = display.slice(0, maxChars) + '…';
+                }
+
+                return { display, full };
+            }
+
+            function formatDateShort(value) {
+                if (!value) return '';
+                const d = new Date(value);
+                if (Number.isNaN(d.getTime())) return '';
+                return d.toISOString().slice(0, 10); // YYYY-MM-DD
+            }
+
+            // ---------- row building (replace your existing html += `...`) ----------
+            const applicant = processApplicantName(c.ApplicantName, 50);
+
+            const officeNumber = escapeHtml(c.OfficeNumber ?? '');
+            const applicantDisplay = escapeHtml(applicant.display);
+            const applicantFull = escapeHtml(String(c.ApplicantName ?? ''));
+            const dateShort = formatDateShort(c.Date) || '';
+            const mainGroup = escapeHtml(c.MainGroup ?? '');
+            const status = escapeHtml(c.StatusTag ?? c.ArchStatus ?? '');
+            const method = escapeHtml(c.MethodTag ?? c.Method ?? '');
+            const officeId = escapeHtml(c.OfficeId ?? '');
+            const tableEsc = escapeHtml(table ?? '');
+            const groupEsc = escapeHtml(c.MainGroup ?? '');
+
+            html += `
+                <tr>
+                    <td>${officeNumber}</td>
+                    <td title="${applicantFull}">${applicantDisplay}</td>
+                    <td>${escapeHtml(dateShort)}</td>
+                    <td>${mainGroup}</td>
+                    <td>${status}</td>
+                    <td>${method}</td>
+                    <td>
+                    <button class="btn-xs btn-ghost show-files" data-id="${officeId}" data-table="${tableEsc}">مستندات</button>
+                    <button class="btn-xs btn-edit edit-app" data-group="${groupEsc}" data-id="${officeId}" data-table="${tableEsc}">تعديل</button>
+                    ${c.PayloadJson
+                                    ? `<button class="btn-xs btn-primary print-doc" data-name="${applicantFull}" data-id="${officeId}" data-table="${tableEsc}">طباعة</button>`
+                                    : ""
+                                }
+                    </td>
+                </tr>
+                `;
+
         });
 
 
@@ -1334,7 +1389,7 @@ function reportsControl(container) {
     async function loadAvailableFilters(type) {
         const res = await fetch(`report_options.php?type=${type}`);
         const data = await res.json();
-        
+
         renderFilters(type, data);
     }
 
@@ -1664,60 +1719,60 @@ async function showSettingsPage(container) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const navLinks = document.querySelectorAll("nav a[data-page]");
-  const main = document.getElementById("dashboard-main");
+    const navLinks = document.querySelectorAll("nav a[data-page]");
+    const main = document.getElementById("dashboard-main");
 
-  navLinks.forEach(link => {
-    link.addEventListener("click", e => {
-      const href = (link.getAttribute("href") || "").trim();
+    navLinks.forEach(link => {
+        link.addEventListener("click", e => {
+            const href = (link.getAttribute("href") || "").trim();
 
-      // If this is a "real" link: allow normal navigation
-      const looksLikeRealLink =
-        href && href !== "#" && href !== "" &&
-        !href.startsWith("javascript:") && !href.startsWith("mailto:") &&
-        (
-          href.startsWith("/") ||    // root-relative -> real
-          href.startsWith("http") || // external URL -> real
-          href.includes(".php")      // server-side page -> real
-        );
+            // If this is a "real" link: allow normal navigation
+            const looksLikeRealLink =
+                href && href !== "#" && href !== "" &&
+                !href.startsWith("javascript:") && !href.startsWith("mailto:") &&
+                (
+                    href.startsWith("/") ||    // root-relative -> real
+                    href.startsWith("http") || // external URL -> real
+                    href.includes(".php")      // server-side page -> real
+                );
 
-      if (looksLikeRealLink) {
-        // Do not prevent default — let the browser navigate.
-        // If you still want to run some tracking or cleanup, do it but don't preventDefault.
-        return;
-      }
+            if (looksLikeRealLink) {
+                // Do not prevent default — let the browser navigate.
+                // If you still want to run some tracking or cleanup, do it but don't preventDefault.
+                return;
+            }
 
-      // Otherwise treat as SPA/internal navigation
-      e.preventDefault();
-      const page = link.getAttribute("data-page");
+            // Otherwise treat as SPA/internal navigation
+            e.preventDefault();
+            const page = link.getAttribute("data-page");
 
-      switch (page) {
-        case "headDepartment":
-          ControlPanel(main);
-          break;
-        case "users":
-          usersControl(main);
-          break;
-        case "mandoubs":
-          mandoubControl(main);
-          break;
-        case "officeCasesControl":
-          officeCasesControl(main);
-          break;
-        case "concularDoc":
-          consularDocsControl(main);
-          break;
-        case "reports":
-          reportsControl(main);
-          break;
-        case "settings":
-          showSettingsPage(main);
-          break;
-        default:
-          showDefaultTable(main);
-      }
+            switch (page) {
+                case "headDepartment":
+                    ControlPanel(main);
+                    break;
+                case "users":
+                    usersControl(main);
+                    break;
+                case "mandoubs":
+                    mandoubControl(main);
+                    break;
+                case "officeCasesControl":
+                    officeCasesControl(main);
+                    break;
+                case "concularDoc":
+                    consularDocsControl(main);
+                    break;
+                case "reports":
+                    reportsControl(main);
+                    break;
+                case "settings":
+                    showSettingsPage(main);
+                    break;
+                default:
+                    showDefaultTable(main);
+            }
+        });
     });
-  });
 
-  consularDocsControl(main);
+    consularDocsControl(main);
 });
